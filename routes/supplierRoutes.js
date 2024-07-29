@@ -1,19 +1,18 @@
 const express = require("express");
 const protect = require("../middleware/authMiddleware.js");
 const Authorization = require("../middleware/Authorization.middleware.js");
-const { updateTeacherProfileData, addProduct, getTodayCourse, getMyClasses, getTeacherProfileData, updateCourseDates } = require("../controllers/supplierController.js");
+const { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode } = require("../controllers/supplierController.js");
 
 const supplierRoutes = express.Router();
 
 // Apply protect and Authorization middleware to updateTeacherProfile route
-supplierRoutes.put("/addCourse", protect, Authorization(["supplier"]), addProduct);
+supplierRoutes.post("/addProduct", protect, Authorization(["supplier", "admin"]), addProduct);
 
-supplierRoutes.put("/updateTeacherProfile", protect, Authorization(["teacher"]), updateTeacherProfileData);
-supplierRoutes.get("/getTeacherProfileData", protect, Authorization(["teacher"]), getTeacherProfileData);
+supplierRoutes.get("/getProducts", protect, Authorization(["supplier"]), getProducts);
 
-supplierRoutes.route("/getTodayCourse").get(protect, Authorization(["teacher"]), getTodayCourse);
-supplierRoutes.route("/getMyClasses").get(protect, Authorization(["teacher"]), getMyClasses);
+supplierRoutes.get("/getPincode", protect, Authorization(["supplier"]), getPincode);
 
-supplierRoutes.route("/updateCourseDates").post(protect, Authorization(["admin"]), updateCourseDates);
+supplierRoutes.put("/updateSupplierProfileData", protect, Authorization(["supplier"]), updateSupplierProfileData);
+supplierRoutes.get("/getSupplierProfileData", protect, Authorization(["supplier"]), getSupplierProfileData);
 
 module.exports = { supplierRoutes };

@@ -3,7 +3,7 @@ const asyncHandler = require("express-async-handler");
 const { User } = require("../models/userModel.js");
 const dotenv = require("dotenv");
 const ErrorHandler = require("../utils/errorHandler.js");
-const Course = require("../models/course.js");
+const Product = require("../models/productModel.js");
 const upload = require("../middleware/uploadMiddleware.js");
 const fs = require("fs");
 const { addDays, isWeekend } = require("date-fns");
@@ -12,27 +12,22 @@ const TeacherPayment = require("../models/TeacherPaymentModel.js");
 
 dotenv.config();
 
-const updateTeacherProfileData = asyncHandler(async (req, res) => {
+const updateSupplierProfileData = asyncHandler(async (req, res) => {
   req.uploadPath = "uploads/profiles";
-  upload.fields([
-    { name: "profile_pic", maxCount: 1 },
-    { name: "background_image", maxCount: 1 },
-  ])(req, res, async (err) => {
+  upload.fields([{ name: "profile_pic", maxCount: 1 }])(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ error: err.message });
     }
 
-    const { first_name, last_name, mobile, email, experience, education, languages, expertise, about_me } = req.body;
-
-    const userId = req.headers.userID; // Assuming you have user authentication middleware
+    const { full_name, mobile, email, address, pin_code } = req.body;
+    const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
 
     // Get the profile picture path if uploaded
     const profile_pic = req.files.profile_pic ? `${req.uploadPath}/${req.files.profile_pic[0].filename}` : null;
-    const background_image = req.files.background_image ? `${req.uploadPath}/${req.files.background_image[0].filename}` : null;
 
     try {
       // Find the current user to get the old image paths
-      const currentUser = await User.findById(userId);
+      const currentUser = await User.findById(supplier_id);
       if (!currentUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -43,11 +38,8 @@ const updateTeacherProfileData = asyncHandler(async (req, res) => {
       };
 
       // Update optional fields if provided
-      if (first_name) {
-        updateFields.first_name = first_name;
-      }
-      if (last_name) {
-        updateFields.last_name = last_name;
+      if (full_name) {
+        updateFields.full_name = full_name;
       }
       if (mobile) {
         updateFields.mobile = mobile;
@@ -55,25 +47,8 @@ const updateTeacherProfileData = asyncHandler(async (req, res) => {
       if (email) {
         updateFields.email = email;
       }
-      if (experience) {
-        updateFields.experience = experience;
-      }
-      if (education) {
-        updateFields.education = education;
-      }
-      if (languages) {
-        updateFields.languages = languages;
-      }
-      if (expertise) {
-        updateFields.expertise = expertise;
-      }
-      if (about_me) {
-        updateFields.about_me = about_me;
-      }
-
-      // Construct full_name if first_name or last_name is provided
-      if (first_name || last_name) {
-        updateFields.full_name = `${first_name || currentUser.first_name} ${last_name || currentUser.last_name}`;
+      if (address) {
+        updateFields.address = address;
       }
 
       // Check if there is a new profile pic uploaded and delete the old one
@@ -87,37 +62,42 @@ const updateTeacherProfileData = asyncHandler(async (req, res) => {
         updateFields.profile_pic = profile_pic;
       }
 
-      // Check if there is a new background image uploaded and delete the old one
-      if (background_image && currentUser.background_image) {
-        const oldBackgroundImagePath = currentUser.background_image;
-        updateFields.background_image = background_image;
-
-        // Delete the old background image
-        deleteFile(oldBackgroundImagePath);
-      } else if (background_image) {
-        updateFields.background_image = background_image;
+      // Handle pin_code as an array using $addToSet to avoid duplicates
+      let pinCodesArray = [];
+      if (pin_code) {
+        pinCodesArray = Array.isArray(pin_code) ? pin_code : [parseInt(pin_code, 10)];
+        pinCodesArray = [...new Set(pinCodesArray)]; // Remove duplicates
       }
 
       // Update the user's profile fields
-      const updatedUser = await User.findByIdAndUpdate(userId, { $set: updateFields }, { new: true });
+      const updatedUser = await User.findByIdAndUpdate(
+        supplier_id,
+        {
+          $set: {
+            full_name: updateFields.full_name,
+            mobile: updateFields.mobile,
+            email: updateFields.email,
+            address: updateFields.address,
+            profile_pic: updateFields.profile_pic,
+            datetime: updateFields.datetime,
+          },
+          $addToSet: { pin_code: { $each: pinCodesArray } },
+        },
+        { new: true }
+      );
 
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      // Return the updated user data
       return res.status(200).json({
         _id: updatedUser._id,
-        first_name: updatedUser.first_name,
-        last_name: updatedUser.last_name,
         full_name: updatedUser.full_name,
         mobile: updatedUser.mobile,
         email: updatedUser.email,
-        experience: updatedUser.experience,
-        education: updatedUser.education,
-        languages: updatedUser.languages,
-        expertise: updatedUser.expertise,
-        about_me: updatedUser.about_me,
-        background_image: updatedUser.background_image,
+        address: updatedUser.address,
+        pin_code: updatedUser.pin_code,
         profile_pic: updatedUser.profile_pic,
         status: true,
       });
@@ -128,45 +108,21 @@ const updateTeacherProfileData = asyncHandler(async (req, res) => {
   });
 });
 
-const getTeacherProfileData = asyncHandler(async (req, res) => {
-  const userId = req.headers.userID; // Assuming you have user authentication middleware
+const getSupplierProfileData = asyncHandler(async (req, res) => {
+  const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
 
   try {
     // Find the user by ID
-    const user = await User.findById(userId);
+    const user = await User.findById(supplier_id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    let paymentDetails = {};
-    if (user.payment_id) {
-      // Fetch payment details from TeacherPayment model
-      const payment = await TeacherPayment.findById(user.payment_id);
-      if (payment) {
-        paymentDetails = {
-          type: payment.advance ? "advance" : "master", // Determine type based on available fields
-          amount: payment.advance || payment.master,
-        };
-      }
-    }
-
     // Return the user's profile information
     return res.status(200).json({
-      _id: user._id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      full_name: user.full_name,
-      mobile: user.mobile,
-      email: user.email,
-      experience: user.experience,
-      education: user.education,
-      languages: user.languages,
-      expertise: user.expertise,
-      about_me: user.about_me,
-      background_image: user.background_image,
-      profile_pic: user.profile_pic,
+      user: user,
+
       status: true,
-      payment: paymentDetails,
     });
   } catch (error) {
     console.error("Error fetching user profile:", error.message);
@@ -185,356 +141,134 @@ function deleteFile(filePath) {
   });
 }
 
-const addProduct = asyncHandler(async (req, res) => {
-  req.uploadPath = "uploads/course";
-  upload.single("course_image")(req, res, async (err) => {
+const addProduct = asyncHandler(async (req, res, next) => {
+  req.uploadPath = "uploads/product";
+  upload.single("product_image")(req, res, async (err) => {
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
-    const { title, category_id, sub_category_id, type, startTime, endTime, startDate } = req.body;
-    const teacher_id = req.headers.userID; // Assuming user authentication middleware sets this header
+    console.log(req.body);
+    const { english_name, local_name, other_name, category_id, price, quantity, product_type, product_size, description, pin_code } = req.body;
+    const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
     try {
       // Validate required fields
-      if (!title || !category_id || !sub_category_id || !type || !startTime || !endTime || !startDate) {
+      if (!english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !supplier_id || !pin_code) {
         return res.status(400).json({
-          error: "All fields (title, category_id, sub_category_id, type, startTime, endTime, startDate) are required.",
+          message: "All fields (english_name, price, quantity, product_type, product_size, description) are required.",
+          status: false,
         });
       }
-
-      // Validate and parse startDate
-      const parsedStartDate = new Date(startDate.replace(/\//g, "-")); // Replace "/" with "-" for correct parsing
-      if (isNaN(parsedStartDate.getTime())) {
-        return res.status(400).json({ error: "Invalid date format. Use YYYY/MM/DD." });
-      }
-
-      // Calculate start and end of the month based on startDate
-      const startOfMonth = new Date(parsedStartDate.getFullYear(), parsedStartDate.getMonth(), 1);
-      const endOfMonth = new Date(parsedStartDate.getFullYear(), parsedStartDate.getMonth() + 1, 0);
-
-      // Check if the teacher has already added 6 courses this month
-      const coursesCount = await Course.countDocuments({
-        teacher_id,
-        startDate: { $gte: formatDate(startOfMonth), $lte: formatDate(endOfMonth) }, // Count documents within the current month
-      });
-
-      if (coursesCount >= 6) {
-        const nextMonthStart = getNextMonthStart(parsedStartDate);
-        return res.status(400).json({
-          error: `Teacher cannot add more than 6 courses in a month. Next available date to add courses: ${formatDate(nextMonthStart)}.`,
-        });
-      }
-
-      // Check if the course types are valid for the current month
-      const courses = await Course.find({
-        teacher_id,
-        startDate: { $gte: formatDate(startOfMonth), $lte: formatDate(endOfMonth) }, // Only consider courses in the current month
-      });
-
-      let groupCourseCount = 0;
-      let singleCourseCount = 0;
-
-      courses.forEach((course) => {
-        if (course.type === "group_course") {
-          groupCourseCount++;
-        } else if (course.type === "single_course") {
-          singleCourseCount++;
-        }
-      });
-
-      // Check if the teacher can add more of the requested type
-      if ((type === "group_course" && groupCourseCount >= 3) || (type === "single_course" && singleCourseCount >= 3)) {
-        return res.status(400).json({ error: `Teacher cannot add more than 3 ${type} courses.` });
-      }
-
-      // Calculate end date excluding weekends
-      const endDate = calculateEndDate(startDate, 21); // Excluding weekends
-      const formattedStartDate = formatDate(startDate);
-      const formattedEndDate = formatDate(endDate);
-
       // Get the profile picture path if uploaded
-      const course_image = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
+      const product_image = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
 
-      // Create new course with parsed dates
-      const newCourse = new Course({
-        title,
-        course_image,
+      // Handle pin_code as an array
+      const pinCodesArray = pin_code ? (Array.isArray(pin_code) ? pin_code : [pin_code]) : [];
+
+      // Fetch user data to validate pin codes
+      const user = await User.findById(supplier_id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found", status: false });
+      }
+
+      const userPinCodes = user.pin_code || [];
+
+      // Check if provided pin codes exist in the user's pin_code array
+      const invalidPinCodes = pinCodesArray.filter((pin) => !userPinCodes.includes(pin));
+      if (invalidPinCodes.length > 0) {
+        return res.status(400).json({ message: `Invalid pin codes: ${invalidPinCodes.join(", ")}`, status: false });
+      }
+
+      // Create new Product with parsed dates
+      const newProduct = new Product({
+        product_image,
+        english_name,
+        local_name,
+        other_name,
         category_id,
-        sub_category_id,
-        type,
-        startTime,
-        endTime,
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-        teacher_id,
+        price,
+        quantity,
+        product_type,
+        product_size,
+        description,
+        supplier_id,
+        pin_code: pinCodesArray,
       });
 
-      const savedCourse = await newCourse.save();
+      const savedProduct = await newProduct.save();
 
       res.status(201).json({
-        _id: savedCourse._id,
-        title: savedCourse.title,
-        course_image: savedCourse.course_image,
-        category_id: savedCourse.category_id,
-        sub_category_id: savedCourse.sub_category_id,
-        type: savedCourse.type,
-        startTime: savedCourse.startTime,
-        endTime: savedCourse.endTime,
-        startDate: savedCourse.startDate,
-        endDate: savedCourse.endDate,
-        teacher_id: savedCourse.teacher_id,
+        _id: savedProduct._id,
+        product_image: savedProduct.product_image,
+        english_name: savedProduct.english_name,
+        local_name: savedProduct.local_name,
+        other_name: savedProduct.other_name,
+        category_id: savedProduct.category_id,
+        price: savedProduct.price,
+        quantity: savedProduct.quantity,
+        product_type: savedProduct.product_type,
+        product_size: savedProduct.product_size,
+        description: savedProduct.description,
+        supplier_id: savedProduct.supplier_id,
+        pin_code: savedProduct.pin_code,
         status: true,
       });
     } catch (error) {
-      console.error("Error adding course:", error.message);
+      console.error("Error adding product:", error.message);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
 });
 
-const updateCourseDates = asyncHandler(async (req, res) => {
-  const { course_id, newStartDate } = req.body;
-  const teacher_id = req.headers.userID;
+const getProducts = asyncHandler(async (req, res) => {
+  const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const limit = 10; // Number of products per page
 
   try {
-    // Validate required fields
-    if (!course_id || !newStartDate) {
-      return res.status(400).json({ error: "Course ID and new start date are required." });
+    if (!supplier_id) {
+      return res.status(400).json({
+        message: "Supplier ID is required.",
+        status: false,
+      });
     }
 
-    // Validate and parse new startDate
-    const parsedNewStartDate = new Date(newStartDate.replace(/\//g, "-")); // Replace "/" with "-" for correct parsing
-    if (isNaN(parsedNewStartDate.getTime())) {
-      return res.status(400).json({ error: "Invalid date format. Use YYYY/MM/DD." });
-    }
-
-    // Find the course by course_id and teacher_id
-    const course = await Course.findById({ _id: course_id, teacher_id: teacher_id });
-    console.log(course);
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    // Calculate new end date excluding weekends
-    const newEndDate = calculateEndDate(newStartDate, 21); // Excluding weekends
-    const formattedNewStartDate = formatDate(newStartDate);
-    const formattedNewEndDate = formatDate(newEndDate);
-
-    console.log(formattedNewStartDate);
-    console.log(formattedNewEndDate);
-
-    // Update course with new dates
-    course.startDate = formattedNewStartDate;
-    course.endDate = formattedNewEndDate;
-
-    const updatedCourse = await course.save();
+    const skip = (page - 1) * limit;
+    const totalProducts = await Product.countDocuments({ supplier_id });
+    const products = await Product.find({ supplier_id }).skip(skip).limit(limit);
 
     res.status(200).json({
-      _id: updatedCourse._id,
-      title: updatedCourse.title,
-      category_id: updatedCourse.category_id,
-      sub_category_id: updatedCourse.sub_category_id,
-      type: updatedCourse.type,
-      startTime: updatedCourse.startTime,
-      endTime: updatedCourse.endTime,
-      startDate: updatedCourse.startDate,
-      endDate: updatedCourse.endDate,
-      teacher_id: updatedCourse.teacher_id,
+      products,
+      page,
+      totalPages: Math.ceil(totalProducts / limit),
+      totalProducts,
       status: true,
     });
   } catch (error) {
-    console.error("Error updating course dates:", error.message);
+    console.error("Error fetching products:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-const getTodayCourse = asyncHandler(async (req, res) => {
-  const teacher_id = req.headers.userID; // Assuming user authentication middleware sets this header
-  const currentDate = new Date(); // Get current date
-  const formattedCurrentDate = formatDate(currentDate); // Format date to YYYY-MM-DD
-
+const getPincode = asyncHandler(async (req, res) => {
+  const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
   try {
-    // Find courses where startDate matches the current date and teacher_id matches
-    const courses = await Course.find({
-      teacher_id,
-      startDate: { $lte: formattedCurrentDate }, // Format current date to match stored
-      endDate: { $gte: formattedCurrentDate },
-      userIds: { $ne: [] },
-    })
-      .sort({ startTime: -1 }) // Sort by startTime ascending order
-      .exec();
-
-    if (!courses || courses.length === 0) {
-      return res.status(200).json({
-        message: "Course Not Found",
+    if (!supplier_id) {
+      return res.status(400).json({
+        message: "Supplier ID is required.",
         status: false,
       });
     }
+    const Pincodes = await User.findById({ _id: supplier_id });
 
-    // Extracting all userIds from courses
-    const userIds = courses.reduce((acc, course) => {
-      acc.push(...course.userIds);
-      return acc;
-    }, []);
-
-    // Fetching only required fields from User collection
-    const users = await User.find(
-      { _id: { $in: userIds } },
-      {
-        profile_pic: 1,
-        ConnectyCube_token: 1,
-        ConnectyCube_id: 1,
-        full_name: 1,
-        firebase_token: 1,
-      }
-    );
-
-    // Mapping userIds to user details for quick lookup
-    const userMap = users.reduce((acc, user) => {
-      acc[user._id] = user;
-      return acc;
-    }, {});
-
-    // Adding user details to each course
-    const coursesWithUsersAndDays = [];
-    for (let i = 0; i < courses.length; i++) {
-      const course = courses[i];
-      const daysArray = calculateDaysArray(course.startDate, course.endDate);
-
-      const courseWithUsersAndDays = {
-        ...course.toObject({ getters: true, virtuals: true }),
-        users: course.userIds.map((userId) => userMap[userId]),
-        days: daysArray,
-        course_image: course.course_image,
-      };
-
-      coursesWithUsersAndDays.push(courseWithUsersAndDays);
-    }
-
-    res.status(200).json({ courses: coursesWithUsersAndDays });
+    res.status(200).json({
+      Pincodes: Pincodes.pin_code,
+      status: true,
+    });
   } catch (error) {
-    console.error("Error fetching today's courses:", error.message);
+    console.error("Error fetching pincode:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-const getMyClasses = asyncHandler(async (req, res) => {
-  const teacher_id = req.headers.userID; // Assuming user authentication middleware sets this header
-  const currentDate = new Date(); // Get current date
-  const formattedCurrentDate = formatDate(currentDate); // Format date to YYYY/MM/DD
-
-  try {
-    // Find courses where startDate matches the current date and teacher_id matches
-    const courses = await Course.find({
-      teacher_id,
-      startDate: { $lte: formattedCurrentDate }, // Format current date to match stored
-      endDate: { $gte: formattedCurrentDate },
-    })
-      .sort({ startTime: -1 }) // Sort by startTime descending order
-      .exec();
-
-    if (!courses || courses.length === 0) {
-      return res.status(200).json({
-        message: "Course Not Found",
-        status: false,
-      });
-    }
-
-    // Fetching only required fields from User collection
-    const userIds = courses.reduce((acc, course) => {
-      acc.push(...course.userIds);
-      return acc;
-    }, []);
-
-    const users = await User.find(
-      { _id: { $in: userIds } },
-      {
-        profile_pic: 1,
-        ConnectyCube_token: 1,
-        ConnectyCube_id: 1,
-        full_name: 1,
-        firebase_token: 1,
-      }
-    );
-
-    const userMap = users.reduce((acc, user) => {
-      acc[user._id] = user;
-      return acc;
-    }, {});
-
-    const coursesWithUsers = [];
-
-    // Iterate over each course to add users and calculate days array
-    for (let i = 0; i < courses.length; i++) {
-      const course = courses[i];
-
-      // Calculate days array between startDate and endDate
-      const daysArray = calculateDaysArray(course.startDate, course.endDate);
-
-      // Add user details to each course
-      const courseWithUsers = {
-        ...course.toObject({ getters: true, virtuals: true }),
-        users: course.userIds.map((userId) => userMap[userId]),
-        days: daysArray,
-        course_image: course.course_image,
-      };
-
-      coursesWithUsers.push(courseWithUsers);
-    }
-
-    res.status(200).json({ courses: coursesWithUsers });
-  } catch (error) {
-    console.error("Error fetching today's courses:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-function calculateDaysArray(startDate, endDate) {
-  const daysArray = [];
-  let currentDate = new Date(startDate);
-  let daysCount = 0;
-
-  while (currentDate <= new Date(endDate) && daysCount < 21) {
-    if (!isWeekend(currentDate)) {
-      daysArray.push(formatDate(currentDate));
-      daysCount++;
-    }
-    currentDate = addDays(currentDate, 1);
-  }
-
-  return daysArray;
-}
-
-// Helper function to format date in YYYY/MM/DD format
-function formatDate(date) {
-  const d = new Date(date);
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${year}/${month}/${day}`;
-}
-
-// Helper function to calculate the start of the next month
-function getNextMonthStart(date) {
-  const d = new Date(date);
-  const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-  return nextMonth;
-}
-
-// Function to calculate end date excluding weekends using date-fns
-const calculateEndDate = (startDate, daysToAdd) => {
-  let currentDay = new Date(startDate);
-  let count = 0;
-
-  while (count < daysToAdd) {
-    currentDay = addDays(currentDay, 1);
-
-    if (!isWeekend(currentDay)) {
-      count++;
-    }
-  }
-
-  return currentDay.toISOString().split("T")[0];
-};
-
-module.exports = { updateTeacherProfileData, addProduct, getTodayCourse, getMyClasses, getTeacherProfileData, updateCourseDates };
+module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode };

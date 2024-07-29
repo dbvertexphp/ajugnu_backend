@@ -1,7 +1,7 @@
 // controllers/transactionController.js
 const asyncHandler = require("express-async-handler");
 const Transaction = require("../models/transactionModel");
-const Course = require("../models/course");
+const Course = require("../models/productModel");
 const baseURL = process.env.BASE_URL;
 const { User } = require("../models/userModel.js");
 const { addNotification } = require("./teacherNotificationController");

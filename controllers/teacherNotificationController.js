@@ -1,6 +1,6 @@
 const TeacherNotification = require("../models/teacherNotificationModel");
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/course");
+const Course = require("../models/productModel");
 const { User } = require("../models/userModel.js");
 const admin = require("firebase-admin"); // Import firebase-admin
 const TeacherAttendance = require("../models/teacherAttendanceModel.js");

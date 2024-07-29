@@ -18,7 +18,7 @@ const userSchema = mongoose.Schema({
   otp: { type: String },
   otp_verified: { type: Number, default: 0 },
   firebase_token: { type: String, default: "dummy_token" },
-  pin_code: { type: Number, default: null },
+  pin_code: { type: [Number], default: [] },
   profile_pic: {
     type: String,
   },

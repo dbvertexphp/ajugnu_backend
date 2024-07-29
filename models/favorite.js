@@ -4,17 +4,15 @@ const { Schema } = mongoose;
 const favoriteSchema = new Schema(
   {
     user_id: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    teacher_ids: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: true,
-      },
-    ],
+    product_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
   },
   { timestamps: true }
 );

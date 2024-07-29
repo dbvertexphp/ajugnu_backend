@@ -21,7 +21,8 @@ const ErrorHandler = require("../utils/errorHandler.js");
 const http = require("https");
 const jwt = require("jsonwebtoken");
 const upload = require("../middleware/uploadMiddleware.js");
-const Course = require("../models/course.js");
+const Product = require("../models/productModel.js");
+const Cart = require("../models/cartModel.js");
 const TeacherPayment = require("../models/TeacherPaymentModel.js");
 const Favorite = require("../models/favorite.js");
 const Rating = require("../models/ratingModel.js");
@@ -644,6 +645,197 @@ const ChangePassword = asyncHandler(async (req, res, next) => {
   }
 });
 
+// Controller function to get products by category_id
+const getProductByCategory_id = asyncHandler(async (req, res) => {
+  const { category_id } = req.body;
+
+  try {
+    // Validate category_id
+    if (!category_id) {
+      return res.status(400).json({ message: "Category ID is required", status: false });
+    }
+
+    // Fetch products by category_id
+    const products = await Product.find({ category_id });
+
+    // Check if products are found
+    if (!products.length) {
+      return res.status(404).json({ message: "No products found for the given category", status: false });
+    }
+
+    // Return the products
+    res.status(200).json({
+      status: true,
+      products,
+    });
+  } catch (error) {
+    console.error("Error fetching products by category_id:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Controller function to search products
+const searchProducts = asyncHandler(async (req, res) => {
+  const { q } = req.body; // Query parameter for search terms
+
+  try {
+    // Validate search query
+    if (!q) {
+      return res.status(400).json({ message: "Search query is required", status: false });
+    }
+
+    // Create a regex pattern for case-insensitive search
+    const regex = new RegExp(q, "i");
+
+    // Fetch products matching the search query
+    const products = await Product.find({
+      $or: [{ english_name: regex }, { local_name: regex }, { other_name: regex }],
+    });
+
+    // Check if products are found
+    if (!products.length) {
+      return res.status(404).json({ message: "No products found matching the search query", status: false });
+    }
+
+    // Return the products
+    res.status(200).json({
+      status: true,
+      products,
+    });
+  } catch (error) {
+    console.error("Error searching products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Define the addFavoriteProduct function
+const addFavoriteProduct = asyncHandler(async (req, res) => {
+  const { product_id } = req.body;
+  const userID = req.headers.userID;
+
+  try {
+    // Validate product_id and userID
+    if (!product_id) {
+      return res.status(400).json({ message: "Product ID is required", status: false });
+    }
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Check if the product exists
+    const product = await Product.findById(product_id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
+
+    // Create a new favorite record
+    const favorite = new Favorite({
+      user_id: userID,
+      product_id,
+    });
+
+    // Save the favorite record
+    await favorite.save();
+
+    // Return success response
+    res.status(201).json({
+      status: true,
+      message: "Product added to favorites successfully",
+      favorite,
+    });
+  } catch (error) {
+    console.error("Error adding favorite product:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Define the removeFavoriteProduct function
+const removeFavoriteProduct = asyncHandler(async (req, res) => {
+  const { product_id } = req.body;
+  const userID = req.headers.userID;
+
+  try {
+    // Validate product_id and userID
+    if (!product_id) {
+      return res.status(400).json({ message: "Product ID is required", status: false });
+    }
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Find and remove the favorite record
+    const favorite = await Favorite.findOneAndDelete({
+      user_id: userID,
+      product_id: product_id,
+    });
+
+    if (!favorite) {
+      return res.status(404).json({ message: "Favorite product not found", status: false });
+    }
+
+    // Return success response
+    res.status(200).json({
+      status: true,
+      message: "Product removed from favorites successfully",
+    });
+  } catch (error) {
+    console.error("Error removing favorite product:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Define the addToCart function
+const addToCart = asyncHandler(async (req, res) => {
+  const { product_id, quantity } = req.body;
+  const userID = req.headers.userID;
+
+  try {
+    // Validate product_id, quantity, and userID
+    if (!product_id) {
+      return res.status(400).json({ message: "Product ID is required", status: false });
+    }
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ message: "Quantity should be a positive number", status: false });
+    }
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Check if the product exists
+    const product = await Product.findById(product_id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
+
+    // Check if the product is already in the cart
+    let cartItem = await Cart.findOne({ user_id: userID, product_id: product_id });
+    if (cartItem) {
+      // Update the quantity of the existing cart item
+      cartItem.quantity += quantity;
+    } else {
+      // Create a new cart item
+      cartItem = new Cart({
+        user_id: userID,
+        product_id: product_id,
+        quantity: quantity,
+      });
+    }
+
+    // Save the cart item
+    await cartItem.save();
+
+    // Return success response
+    res.status(201).json({
+      status: true,
+      message: "Product added to cart successfully",
+      cartItem,
+    });
+  } catch (error) {
+    console.error("Error adding product to cart:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 const bank_Detail_create = asyncHandler(async (req, res) => {
   const { bankName, accountNumber, ifscCode, bankAddress, teacherName } = req.body;
   const userId = req.headers.userID; // Assuming you have user authentication middleware
@@ -760,96 +952,6 @@ const getAllUsers = asyncHandler(async (req, res) => {
   }
 });
 
-const getAllTeachers = asyncHandler(async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    const user_id = req.headers.userID;
-
-    // Search keyword from query params
-    const searchKeyword = req.query.search || "";
-
-    const query = {
-      role: "teacher",
-      $or: [{ first_name: { $regex: searchKeyword, $options: "i" } }, { last_name: { $regex: searchKeyword, $options: "i" } }],
-    };
-
-    const teachers = await User.find(query)
-      .populate({
-        path: "payment_id",
-      })
-      .skip(skip)
-      .limit(limit);
-
-    const totalTeachers = await User.countDocuments(query);
-
-    // Fetch the user's favorite teachers
-    const favorite = await Favorite.findOne({ user_id });
-
-    const favoriteTeacherIds = favorite ? favorite.teacher_ids.map((id) => id.toString()) : [];
-
-    // Map each teacher to an array of promises
-    const transformedTeachersPromises = teachers.map(async (teacher) => {
-      let transformedTeacher = { ...teacher.toObject() }; // Convert Mongoose document to plain JavaScript object
-      if (transformedTeacher.watch_time) {
-        transformedTeacher.watch_time = convertSecondsToReadableTimeAdmin(transformedTeacher.watch_time);
-      }
-
-      // Determine the payment type dynamically based on payment_id
-      if (transformedTeacher.payment_id) {
-        let paymentType;
-        let paymentAmount;
-
-        if (transformedTeacher.payment_id.advance !== undefined) {
-          paymentType = "advance";
-          paymentAmount = transformedTeacher.payment_id.advance;
-        } else if (transformedTeacher.payment_id.master !== undefined) {
-          paymentType = "master";
-          paymentAmount = transformedTeacher.payment_id.master;
-        } else {
-          // Handle case where neither advance nor master is defined
-          paymentType = null;
-          paymentAmount = null;
-        }
-
-        transformedTeacher.payment = {
-          type: paymentType,
-          amount: paymentAmount,
-        };
-        delete transformedTeacher.payment_id; // Remove payment_id from the teacher object
-      } else {
-        transformedTeacher.payment = {
-          type: null,
-          amount: null,
-        };
-      }
-
-      // Add favorite field
-      transformedTeacher.favorite = favoriteTeacherIds.includes(teacher._id.toString());
-
-      return { teacher: transformedTeacher };
-    });
-
-    // Execute all promises concurrently
-    const transformedTeachers = await Promise.all(transformedTeachersPromises);
-
-    res.json({
-      Teachers: transformedTeachers,
-
-      total_rows: totalTeachers,
-      current_page: page,
-      total_pages: Math.ceil(totalTeachers / limit),
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      status: false,
-    });
-  }
-});
-
 const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -874,63 +976,6 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
       total_rows: totalSuppliers,
       current_page: page,
       total_pages: Math.ceil(totalSuppliers / limit),
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      status: false,
-    });
-  }
-});
-
-const getAllUsersWebsite = asyncHandler(async (req, res) => {
-  const { page = 1, search = "" } = req.body;
-  const perPage = 10; // You can adjust this according to your requirements
-
-  // Build the query based on search
-  let query = {};
-  if (search) {
-    query = {
-      $or: [{ full_name: { $regex: search, $options: "i" } }, { username: { $regex: search, $options: "i" } }],
-    };
-  }
-
-  try {
-    if (req.user && req.user._id) {
-      // Only exclude req.user._id if it's available
-      query._id = { $ne: req.user._id };
-    }
-
-    const users = await User.find(query)
-      .select("_id first_name last_name username pic")
-      .skip((page - 1) * perPage)
-      .limit(perPage);
-
-    const totalCount = await User.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / perPage);
-
-    // Map each user to an array of promises
-    const transformedUsersPromises = users.map(async (user) => {
-      let transformedUser = { ...user.toObject() }; // Convert Mongoose document to plain JavaScript object
-      if (transformedUser.pic) {
-        const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
-        transformedUser.pic = getSignedUrl_pic;
-      }
-      if (transformedUser.watch_time) {
-        transformedUser.watch_time = convertSecondsToReadableTime(transformedUser.watch_time);
-      }
-      return transformedUser;
-    });
-
-    // Execute all promises concurrently
-    const transformedUsers = await Promise.all(transformedUsersPromises);
-
-    res.json({
-      data: transformedUsers,
-      page: page.toString(),
-      total_rows: totalCount,
-      status: true,
     });
   } catch (error) {
     console.error(error);
@@ -1186,166 +1231,6 @@ const getReview = asyncHandler(async (req, res) => {
   }
 });
 
-const Watch_time_update = asyncHandler(async (req, res) => {
-  try {
-    const { time } = req.body;
-    const userId = req.user._id;
-
-    if (!userId) {
-      return res.status(400).json({
-        message: "User ID not provided in headers",
-      });
-    }
-
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
-
-    // Incoming time ko seconds mein convert kare
-    const incomingTimeInSeconds = calculateTimeInSecondsFromInput(time);
-
-    // Update watch_time field in the user model
-    user.watch_time += incomingTimeInSeconds;
-
-    // Save the updated user
-    await user.save();
-
-    return res.json({
-      message: "Watch time updated successfully",
-      updatedUser: user,
-    });
-  } catch (error) {
-    console.error("Watch_time_update API error:", error.message);
-    return res.status(500).json({
-      message: "Internal Server Error",
-    });
-  }
-});
-
-const websiteNotificationToken = asyncHandler(async (req, res) => {
-  try {
-    const { token } = req.body;
-    const user_id = req.user._id;
-
-    // Check if user_id and token are provided
-    if (!user_id || !token) {
-      return res.status(400).json({ error: "Both user_id and token are required" });
-    }
-
-    // Check if the entry with the given user_id exists
-    let existingNotification = await WebNotification.findOne({
-      user_id,
-    });
-
-    if (existingNotification) {
-      // Update the existing entry
-      existingNotification.token = token;
-      await existingNotification.save();
-
-      return res.status(200).json(existingNotification);
-    }
-
-    // Create a new entry
-    const newNotification = await WebNotification.create({
-      user_id,
-      token,
-    });
-
-    return res.status(201).json(newNotification);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-const NotificationList = asyncHandler(async (req, res) => {
-  try {
-    const user_id = req.user._id;
-    const page = req.query.page || 1;
-    const pageSize = 500;
-
-    const notifications = await NotificationMessages.find({
-      receiver_id: user_id,
-    })
-      .sort({ _id: -1 })
-      .skip((page - 1) * pageSize)
-      .limit(pageSize);
-
-    if (!notifications || notifications.length === 0) {
-      return res.status(200).json({ status: false, notifications: [] });
-    }
-
-    await Promise.all(
-      notifications.map(async (notification) => {
-        // Update readstatus to true for the current notification
-        await NotificationMessages.findByIdAndUpdate(notification._id, { readstatus: true });
-      })
-    );
-
-    const notificationList = await Promise.all(
-      notifications.map(async (notification) => {
-        const senderDetails = await User.findById(notification.sender_id);
-
-        const sender = {
-          _id: senderDetails._id,
-          first_name: senderDetails.first_name,
-          last_name: senderDetails.last_name,
-          pic: `${senderDetails.pic}`,
-        };
-
-        const notificationWithSender = {
-          _id: notification._id,
-          sender,
-          message: notification.message,
-          metadata: notification.metadata,
-          type: notification.type,
-          time: NotificationTimer(notification.datetime),
-          date: notification.datetime.split(" ")[0],
-        };
-
-        return notificationWithSender;
-      })
-    );
-
-    res.status(200).json({
-      status: true,
-      notifications: notificationList,
-    });
-  } catch (error) {
-    console.error("Error getting notification list:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-const getNotificationId = asyncHandler(async (req, res) => {
-  try {
-    const sender_id = req.body.sender_id;
-    const type = req.body.type; // Assuming user_id is provided as a query parameter
-    const receiver_id = req.user._id;
-
-    const notifications = await NotificationMessages.findOne(
-      {
-        sender_id: sender_id,
-        receiver_id: receiver_id,
-        type: type, // Filtering by type 'Friend_Request'
-      },
-      "_id"
-    ); // Only selecting the _id field
-
-    res.status(200).json({
-      status: true,
-      notificetion_id: notifications,
-    });
-  } catch (error) {
-    console.error("Error getting notifications:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
 const UserAdminStatus = asyncHandler(async (req, res) => {
   const userId = req.body.userId;
   try {
@@ -1385,70 +1270,6 @@ const UserAdminStatus = asyncHandler(async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 });
-
-const getUnreadCount = async (req, res) => {
-  try {
-    const user_id = req.user._id;
-    const unreadNotifications = await NotificationMessages.find({
-      receiver_id: user_id,
-      readstatus: false,
-    });
-
-    let unreadCount = unreadNotifications.length;
-    if (unreadCount > 10) {
-      unreadCount = 10;
-    } else if (unreadCount == 0) {
-      unreadCount = "";
-    }
-
-    return res.status(200).json({ status: true, Count: unreadCount });
-  } catch (error) {
-    console.error("Error getting unread count:", error.message);
-    throw new Error("Error getting unread count");
-  }
-};
-
-const NotificationTimer = (databaseTime) => {
-  try {
-    if (!databaseTime) {
-      return "Invalid time";
-    }
-
-    // Calculate current time in IST timezone
-    const currentTime = moment().tz("Asia/Kolkata");
-
-    // Parse the time strings using moment
-    const databaseMoment = moment.tz(databaseTime, "DD-MM-YYYY HH:mm:ss", "Asia/Kolkata");
-
-    // Calculate the difference between the two times
-    const differenceInMilliseconds = currentTime.diff(databaseMoment);
-
-    // Convert the difference to seconds, minutes, hours, and days
-    const duration = moment.duration(differenceInMilliseconds);
-    const seconds = duration.seconds();
-    const minutes = duration.minutes();
-    const hours = duration.hours();
-    const days = duration.days();
-
-    // Construct the time difference string
-    let timeDifference = "";
-    if (days > 0) {
-      timeDifference += `${days} days `;
-    } else if (hours > 0) {
-      timeDifference += `${hours} hours `;
-    } else if (minutes > 0) {
-      timeDifference += `${minutes} minutes `;
-    } else if (seconds > 0) {
-      timeDifference += `${seconds} seconds`;
-    }
-
-    // Return the time difference string
-    return timeDifference.trim() === "" ? "Just now" : timeDifference.trim();
-  } catch (error) {
-    console.error("Error calculating time difference:", error.message);
-    return "Invalid time format";
-  }
-};
 
 const calculateTimeDifference = (datetime) => {
   try {
@@ -1493,26 +1314,6 @@ function convertSecondsToReadableTime(seconds) {
   }
 }
 
-function calculateTimeInSecondsFromInput(time) {
-  // Convert incoming time to seconds
-  const timeLower = time.toLowerCase();
-  if (timeLower.includes("sec")) {
-    // Extract seconds
-    return parseInt(timeLower);
-  } else if (timeLower.includes("min")) {
-    // Extract minutes and convert to seconds
-    return parseInt(timeLower) * 60;
-  } else if (timeLower.includes("hr")) {
-    // Extract hours and convert to seconds
-    return parseInt(timeLower) * 60 * 60;
-  } else if (timeLower.includes("day")) {
-    // Extract days and convert to seconds
-    return parseInt(timeLower) * 24 * 60 * 60;
-  } else {
-    return 0;
-  }
-}
-
 function generateOTP() {
   const min = 1000; // Minimum 4-digit number
   const max = 9999; // Maximum 4-digit number
@@ -1522,32 +1323,6 @@ function generateOTP() {
 
   return otp.toString(); // Convert the number to a string
 }
-
-const getProfilePicUploadUrlS3 = asyncHandler(async (req, res) => {
-  const user_id = req.user._id;
-  const user = await User.findById(user_id);
-  const username = user.username;
-  const profilepicget_url = await PutObjectProfilePic(username);
-
-  return res.status(200).json({
-    profilepicget_url,
-    status: true,
-  });
-});
-
-const ManullyListUpdate = asyncHandler(async (req, res) => {
-  try {
-    // Sabhi users ko 0 subscribe karne ke liye 'subscribe' field ko update karo
-    const result = await User.updateMany({}, { subscribe: 0 });
-
-    // Success response
-    res.json({ message: "Subscriptions updated successfully" });
-  } catch (error) {
-    // Error handling
-    console.error("Error updating subscriptions:", error);
-    res.status(500).json({ error: "Error updating subscriptions" });
-  }
-});
 
 const UpdateMobileAdmin = asyncHandler(async (req, res) => {
   const { UserId, mobile } = req.body;
@@ -1572,113 +1347,6 @@ const UpdateMobileAdmin = asyncHandler(async (req, res) => {
     message: "Mobile number successfully.",
     status: true,
   });
-});
-
-const updateAllUsersFullName = asyncHandler(async (req, res) => {
-  try {
-    // Find all users
-    const users = await User.find({});
-
-    // Update full name for each user
-    for (const user of users) {
-      const fullName = `${user.first_name} ${user.last_name}`;
-      user.full_name = fullName;
-      await user.save({ fields: ["full_name"] }); // Only save full_name field
-      console.log(`Updated full name for user ${user._id}: ${fullName}`);
-    }
-
-    console.log("All users updated successfully");
-  } catch (error) {
-    console.error("Error updating users:", error);
-  }
-});
-
-const Put_Profile_Pic_munally = asyncHandler(async (req, res) => {
-  const profilepicget_url = await PutObjectProfilePic("000000");
-  return res.status(200).json({
-    profilepicget_url,
-    status: true,
-  });
-});
-
-const Delete_DeleteSignedUrlS3 = asyncHandler(async (req, res) => {
-  const profilepicget_url = await DeleteSignedUrlS3("Profile/000000");
-  return res.status(200).json({
-    profilepicget_url,
-    status: true,
-  });
-});
-
-const getAllCourse = asyncHandler(async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    console.log(req.query);
-
-    // Fetch courses with pagination
-    const courses = await Course.find()
-      .populate("category_id")
-      .populate("teacher_id")
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-
-    // Transform the courses as per requirements
-    const transformedCoursesPromises = courses.map(async (course) => {
-      let transformedCourse = { ...course.toObject() }; // Convert Mongoose document to plain JavaScript object
-
-      // Fetch subcategory name
-      const category = await Category.findById(transformedCourse.category_id);
-      if (category) {
-        const subCategory = category.subcategories.id(transformedCourse.sub_category_id);
-        if (subCategory) {
-          transformedCourse.category_name = category.category_name;
-          transformedCourse.subcategory_name = subCategory.subcategory_name;
-          transformedCourse.category_image = category.category_image;
-        }
-      }
-
-      // Format startDate and endDate
-      transformedCourse.startDate = moment(course.startDate).format("YYYY/MM/DD");
-      transformedCourse.endDate = moment(course.endDate).format("YYYY/MM/DD");
-
-      // Remove the category and subcategory objects from the response if needed
-      delete transformedCourse.category_id.subcategories;
-      delete transformedCourse.sub_category_id;
-
-      return {
-        _id: transformedCourse._id,
-        title: transformedCourse.title,
-        category_name: transformedCourse.category_name,
-        subcategory_name: transformedCourse.subcategory_name,
-        category_image: transformedCourse.category_image,
-        type: transformedCourse.type,
-        startTime: transformedCourse.startTime,
-        endTime: transformedCourse.endTime,
-        startDate: transformedCourse.startDate,
-        endDate: transformedCourse.endDate,
-        teacher: transformedCourse.teacher_id,
-        createdAt: transformedCourse.createdAt,
-        updatedAt: transformedCourse.updatedAt,
-      };
-    });
-
-    // Execute all promises concurrently
-    const transformedCourses = await Promise.all(transformedCoursesPromises);
-
-    // Get total documents count
-    const total = await Course.countDocuments();
-
-    res.json({
-      data: transformedCourses,
-      currentPage: parseInt(page),
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      status: false,
-    });
-  }
 });
 
 const getCoursesByTeacherId = asyncHandler(async (req, res) => {
@@ -1798,163 +1466,6 @@ const getCoursesByTeacherId = asyncHandler(async (req, res) => {
     });
   }
 });
-
-const addMasterPayment = asyncHandler(async (req, res, next) => {
-  let { master } = req.body;
-
-  // Convert string values to numbers if they exist
-  master = master ? parseFloat(master) : undefined;
-
-  if (isNaN(master) || master === 0) {
-    return next(new ErrorHandler("Please enter a valid master payment amount.", 400));
-  }
-
-  const masterPayment = new TeacherPayment({ master });
-  await masterPayment.save();
-
-  res.status(200).json({
-    message: "Master payment added successfully",
-    masterPayment,
-    status: true,
-  });
-});
-
-const updateMasterPayment = asyncHandler(async (req, res, next) => {
-  let { master, id } = req.body;
-  console.log(req.body);
-  // Convert string values to numbers if they exist
-  master = master ? parseFloat(master) : undefined;
-
-  if (isNaN(master) || master === 0) {
-    return next(new ErrorHandler("Please enter a valid master payment amount.", 400));
-  }
-
-  const masterPayment = await TeacherPayment.findById(id);
-
-  if (!masterPayment) {
-    return next(new ErrorHandler("Master payment not found.", 404));
-  }
-
-  masterPayment.master = master;
-
-  await masterPayment.save();
-
-  res.status(200).json({
-    message: "Master payment updated successfully",
-    masterPayment,
-    status: true,
-  });
-});
-
-const addAdvancePayment = asyncHandler(async (req, res, next) => {
-  let { advance } = req.body;
-  // Convert string values to numbers if they exist
-  advance = advance ? parseFloat(advance) : undefined;
-
-  if (isNaN(advance) || advance === 0) {
-    return next(new ErrorHandler("Please enter a valid advance payment amount.", 400));
-  }
-
-  const advancePayment = new TeacherPayment({ advance });
-  await advancePayment.save();
-
-  res.status(200).json({
-    message: "Advance payment added successfully",
-    advancePayment,
-    status: true,
-  });
-});
-
-const updateAdvancePayment = asyncHandler(async (req, res, next) => {
-  let { advance, id } = req.body;
-
-  // Convert string values to numbers if they exist
-  advance = advance ? parseFloat(advance) : undefined;
-
-  if (isNaN(advance) || advance === 0) {
-    return next(new ErrorHandler("Please enter a valid advance payment amount.", 400));
-  }
-
-  const advancePayment = await TeacherPayment.findById(id);
-
-  if (!advancePayment) {
-    return next(new ErrorHandler("Advance payment not found.", 404));
-  }
-
-  advancePayment.advance = advance;
-
-  await advancePayment.save();
-
-  res.status(200).json({
-    message: "Advance payment updated successfully",
-    advancePayment,
-    status: true,
-  });
-});
-
-const getMasterAndAdvancePayments = asyncHandler(async (req, res) => {
-  const payments = await TeacherPayment.find({});
-
-  // Transform payments into the desired format
-  const formattedPayments = [];
-
-  payments.forEach((payment) => {
-    // Add advance payment if exists
-    if (payment.advance) {
-      formattedPayments.push({
-        _id: payment._id,
-        Payment: payment.advance,
-        Type: "advance",
-        createdAt: payment.createdAt,
-        updatedAt: payment.updatedAt,
-      });
-    }
-
-    // Add master payment if exists
-    if (payment.master) {
-      formattedPayments.push({
-        _id: payment._id,
-        Payment: payment.master,
-        Type: "master",
-        createdAt: payment.createdAt,
-        updatedAt: payment.updatedAt,
-      });
-    }
-  });
-
-  res.status(200).json({
-    message: "Payments retrieved successfully",
-    payments: formattedPayments,
-  });
-});
-
-const updateUserPayment = async (req, res, next) => {
-  const { userId, payment_id } = req.body;
-
-  if (!userId || !payment_id) {
-    return next(new ErrorHandler("Please provide userId and payment_id.", 400));
-  }
-
-  const user = await User.findById(userId);
-
-  if (!user) {
-    return next(new ErrorHandler("User not found.", 404));
-  }
-
-  // Assuming user has only one payment object to be updated
-  user.payment_id = payment_id;
-
-  user.updatedAt = Date.now();
-
-  await user.save();
-
-  res.status(200).json({
-    _id: user._id,
-    payment_id: user.payment_id,
-    updatedAt: user.updatedAt,
-  });
-};
-
 const getTeacherAndCourseByTeacher_IdAndType = async (req, res, next) => {
   const { teacher_id, type } = req.body;
   const user_id = req.headers.userID;
@@ -2043,109 +1554,6 @@ const getTeacherAndCourseByTeacher_IdAndType = async (req, res, next) => {
   }
 };
 
-const addFavoriteTeacher = asyncHandler(async (req, res) => {
-  const { teacher_ids } = req.body;
-  const user_id = req.headers.userID;
-
-  // Check if teacher_ids is a string and convert it to an array
-  let teacherIdsArray = [];
-  if (typeof teacher_ids === "string") {
-    teacherIdsArray = [teacher_ids];
-  } else if (Array.isArray(teacher_ids)) {
-    teacherIdsArray = teacher_ids;
-  } else {
-    return res.status(400).json({ message: "Invalid input" });
-  }
-
-  if (!user_id || !teacherIdsArray.length) {
-    return res.status(400).json({ message: "Invalid input" });
-  }
-
-  try {
-    let favorite = await Favorite.findOne({ user_id });
-
-    if (favorite) {
-      // Ensure favorite.teacher_ids is an array
-      if (!Array.isArray(favorite.teacher_ids)) {
-        favorite.teacher_ids = [];
-      }
-
-      // Avoid duplicates
-      teacherIdsArray.forEach((id) => {
-        if (!favorite.teacher_ids.includes(id)) {
-          favorite.teacher_ids.push(id);
-        }
-      });
-
-      await favorite.save();
-    } else {
-      favorite = new Favorite({
-        user_id,
-        teacher_ids: teacherIdsArray,
-      });
-      await favorite.save();
-    }
-
-    res.status(201).json({
-      message: "Favorite teachers updated successfully",
-      favorite,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
-const removeFavoriteTeacher = asyncHandler(async (req, res) => {
-  const { teacher_ids } = req.body;
-  const user_id = req.headers.userID;
-
-  // Check if teacher_ids is a string and convert it to an array
-  let teacherIdsArray = [];
-  if (typeof teacher_ids === "string") {
-    teacherIdsArray = [teacher_ids];
-  } else if (Array.isArray(teacher_ids)) {
-    teacherIdsArray = teacher_ids;
-  } else {
-    return res.status(400).json({ message: "Invalid input" });
-  }
-
-  if (!user_id || !teacherIdsArray.length) {
-    return res.status(400).json({ message: "Invalid input" });
-  }
-
-  try {
-    let favorite = await Favorite.findOne({ user_id });
-
-    if (favorite) {
-      // Ensure favorite.teacher_ids is an array
-      if (Array.isArray(favorite.teacher_ids)) {
-        console.log("Before removal:", favorite.teacher_ids);
-        // Remove the specified teacher_ids
-        favorite.teacher_ids = favorite.teacher_ids.filter((id) => !teacherIdsArray.includes(id.toString()));
-        console.log("After removal:", favorite.teacher_ids);
-        await favorite.save();
-
-        res.status(200).json({
-          message: "Favorite teachers removed successfully",
-          favorite,
-        });
-      } else {
-        res.status(400).json({
-          message: "No favorite teachers found",
-        });
-      }
-    } else {
-      res.status(400).json({
-        message: "Favorite record not found",
-      });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
 const getFavoriteTeachers = asyncHandler(async (req, res) => {
   const user_id = req.headers.userID;
 
@@ -2189,69 +1597,6 @@ const getFavoriteTeachers = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error("Error fetching favorite teachers:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
-const getTeachersBySubcategory = asyncHandler(async (req, res) => {
-  const { subcategory_id } = req.body;
-  const user_id = req.headers.userID;
-  const { search } = req.query; // Assuming search query parameter for teacher name search
-
-  if (!subcategory_id || !user_id) {
-    return res.status(400).json({ message: "Invalid input" });
-  }
-
-  try {
-    // Find courses with the given subcategory_id
-    const courses = await Course.find({
-      sub_category_id: subcategory_id,
-    }).populate("teacher_id");
-
-    if (!courses.length) {
-      return res.status(404).json({
-        message: "No courses found for the given subcategory ID",
-      });
-    }
-
-    // Extract unique teacher IDs
-    const teacherIds = [...new Set(courses.map((course) => course.teacher_id._id.toString()))];
-
-    // Find teacher details for these IDs and populate payment_id
-    let teachers = await User.find({
-      _id: { $in: teacherIds },
-    }).populate("payment_id");
-
-    // Filter teachers by search query (teacher name)
-    if (search) {
-      const searchRegex = new RegExp(search, "i"); // Case-insensitive search regex
-      teachers = teachers.filter((teacher) => searchRegex.test(teacher.full_name));
-    }
-
-    // Fetch the user's favorite teachers
-    const favorite = await Favorite.findOne({ user_id });
-
-    const favoriteTeacherIds = favorite ? favorite.teacher_ids.map((id) => id.toString()) : [];
-
-    // Add favorite status and average rating to each teacher
-    const teachersWithDetails = await Promise.all(
-      teachers.map(async (teacher) => {
-        const ratings = await Rating.find({
-          teacher_id: teacher._id,
-        });
-        const averageRating = ratings.length ? ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length : 0;
-
-        return {
-          ...teacher.toObject(),
-          favorite: favoriteTeacherIds.includes(teacher._id.toString()),
-          averageRating,
-        };
-      })
-    );
-
-    res.status(200).json({ teachers: teachersWithDetails });
-  } catch (error) {
-    console.error("Error fetching teachers:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -2336,14 +1681,14 @@ const getCoursesByUserId = asyncHandler(async (req, res) => {
   }
 });
 
-const updateStudentProfileData = asyncHandler(async (req, res) => {
+const updateCostomerProfileData = asyncHandler(async (req, res) => {
   req.uploadPath = "uploads/profiles";
   upload.single("profile_pic")(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ error: err.message });
     }
 
-    const { first_name, last_name } = req.body;
+    const { full_name, email, mobile, address } = req.body;
     const userId = req.headers.userID; // Assuming you have user authentication middleware
 
     // Get the profile picture path if uploaded
@@ -2362,12 +1707,20 @@ const updateStudentProfileData = asyncHandler(async (req, res) => {
       };
 
       // Update first_name and last_name if provided
-      if (first_name) {
-        updateFields.first_name = first_name;
+      if (full_name) {
+        updateFields.full_name = full_name;
       }
 
-      if (last_name) {
-        updateFields.last_name = last_name;
+      if (email) {
+        updateFields.email = email;
+      }
+
+      if (mobile) {
+        updateFields.mobile = mobile;
+      }
+
+      if (address) {
+        updateFields.address = address;
       }
 
       // Check if there is a new profile pic uploaded and delete the old one
@@ -2390,8 +1743,10 @@ const updateStudentProfileData = asyncHandler(async (req, res) => {
 
       return res.status(200).json({
         _id: updatedUser._id,
-        first_name: updatedUser.first_name,
-        last_name: updatedUser.last_name,
+        full_name: updatedUser.full_name,
+        email: updatedUser.email,
+        mobile: updatedUser.mobile,
+        address: updatedUser.address,
         profile_pic: updatedUser.profile_pic,
         status: true,
       });
@@ -2457,171 +1812,6 @@ const getStudentsPayment = asyncHandler(async (req, res) => {
   }
 });
 
-const getTotalAmount = asyncHandler(async (req, res) => {
-  const teacherId = req.headers.userID; // Assuming you have user authentication middleware
-
-  try {
-    // Find the teacher to get the full_name and profile_pic
-    const teacher = await User.findById(teacherId, "full_name profile_pic");
-    if (!teacher) {
-      return res.status(404).json({ message: "Teacher not found" });
-    }
-
-    // Find all transactions for the given teacher
-    const transactions = await Transaction.find({
-      teacher_id: teacherId,
-    });
-
-    // Calculate the total amount
-    const totalAmount = transactions.reduce((sum, txn) => sum + txn.amount, 0);
-
-    // Group transactions by month
-    const groupedTransactions = groupTransactionsByMonth(transactions);
-
-    // Calculate total and current month amounts
-    const currentDate = new Date();
-    const currentMonthKey = moment(currentDate).format("YYYY-MM");
-    const currentMonthAmount = groupedTransactions[currentMonthKey] ? groupedTransactions[currentMonthKey].reduce((sum, txn) => sum + txn.amount, 0) : 0;
-
-    const monthlyAmounts = Object.keys(groupedTransactions).map((monthKey) => {
-      const monthName = moment(monthKey, "YYYY-MM").format("MMM");
-      return {
-        month: `${monthName} ${moment(monthKey, "YYYY-MM").format("YYYY")}`,
-        amount: groupedTransactions[monthKey].reduce((sum, txn) => sum + txn.amount, 0),
-      };
-    });
-
-    res.status(200).json({
-      message: "Total amounts fetched successfully",
-      totalAmount,
-      currentMonthAmount,
-      monthlyAmounts,
-      teacher: {
-        full_name: teacher.full_name,
-        profile_pic: teacher.profile_pic,
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching total amounts for teacher:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
-function groupTransactionsByMonth(transactions) {
-  const groupedTransactions = {};
-
-  transactions.forEach((txn) => {
-    // Parse datetime using moment to convert it into a Date object
-    const txnDate = moment(txn.datetime, "DD-MM-YYYY").toDate();
-
-    // Format the date to YYYY-MM to use it as the key for grouping
-    const monthKey = moment(txnDate).format("YYYY-MM");
-
-    if (!groupedTransactions[monthKey]) {
-      groupedTransactions[monthKey] = [];
-    }
-    groupedTransactions[monthKey].push(txn);
-  });
-
-  return groupedTransactions;
-}
-
-const updateCourseWithDemoId = asyncHandler(async (req, res) => {
-  const user_id = req.headers.userID;
-  const { teacher_id, course_id } = req.body;
-
-  if (!teacher_id || !course_id || !user_id) {
-    return res.status(400).json({ message: "Invalid input" });
-  }
-
-  try {
-    const course = await Course.findById(course_id);
-
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    // Check if the user has already taken a demo for this course
-    if (course.askdemoid.includes(user_id)) {
-      return res.status(400).json({
-        message: "You have already taken a demo for this course",
-        status: false,
-      });
-    }
-
-    // Check if the teacher is associated with the course
-    if (course.teacher_id.toString() !== teacher_id) {
-      return res.status(403).json({ message: "Teacher not authorized for this course" });
-    }
-
-    // Add user_id to askdemoid array if not already present
-    if (!course.askdemoid) {
-      course.askdemoid = [];
-    }
-
-    if (!course.askdemoid.includes(user_id)) {
-      course.askdemoid.push(user_id);
-      await course.save();
-    }
-
-    res.status(200).json({
-      message: "User ID added to askdemoid successfully",
-      course,
-    });
-  } catch (error) {
-    console.error("Error updating course:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
-const askForDemo = asyncHandler(async (req, res) => {
-  const user_id = req.headers.userID;
-  console.log(user_id);
-  const { course_id, type } = req.body;
-
-  if (!user_id || !course_id || !type) {
-    return res.status(400).json({ message: "Invalid input" });
-  }
-
-  try {
-    const course = await Course.findById(course_id);
-
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    // Check if the user has already purchased the course
-    if (course.askDemoids.includes(user_id) && course.completeAskDemoids.includes(user_id)) {
-      return res.status(400).json({
-        message: "You have already Demo this course",
-        status: false,
-      });
-    }
-
-    if (type == "askDemoids") {
-      if (!course.askDemoids.includes(user_id)) {
-        // Update Course with userId if not already included
-        course.askDemoids.push(user_id);
-        await course.save();
-      }
-    } else if (type == "completeAskDemoids") {
-      if (!course.completeAskDemoids.includes(user_id)) {
-        // Update Course with userId if not already included
-        course.completeAskDemoids.push(user_id);
-        await course.save();
-      }
-    }
-
-    res.status(201).json({
-      message: "Demo added successfully",
-      course: course,
-    });
-  } catch (error) {
-    console.error("Error adding Demo:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
 module.exports = {
   getUsers,
   registerUser,
@@ -2637,47 +1827,26 @@ module.exports = {
   getAllUsers,
   getAllDashboardCount,
   addReview,
-  Watch_time_update,
   getUserView,
   getBankDetails,
   getBankDetailsAdmin,
-  websiteNotificationToken,
-  NotificationList,
   ForgetresendOTP,
-  getProfilePicUploadUrlS3,
   profilePicKey,
   getReview,
-  getUnreadCount,
   updateProfileDataByAdmin,
-  getNotificationId,
   searchUsers,
-  getAllUsersWebsite,
-  // updateUserWatchTime,
   UserAdminStatus,
-  ManullyListUpdate,
   UpdateMobileAdmin,
-  updateAllUsersFullName,
-  Put_Profile_Pic_munally,
-  Delete_DeleteSignedUrlS3,
-  getAllTeachers,
-  getAllCourse,
   getCoursesByTeacherId,
-  getMasterAndAdvancePayments,
-  addAdvancePayment,
-  addMasterPayment,
-  updateMasterPayment,
-  updateAdvancePayment,
-  updateUserPayment,
   getTeacherAndCourseByTeacher_IdAndType,
-  addFavoriteTeacher,
-  removeFavoriteTeacher,
+  addFavoriteProduct,
+  removeFavoriteProduct,
   getFavoriteTeachers,
-  getTeachersBySubcategory,
   getCoursesByUserId,
-  updateStudentProfileData,
+  updateCostomerProfileData,
   getStudentsPayment,
-  getTotalAmount,
   getAllSuppliersInAdmin,
-  updateCourseWithDemoId,
-  askForDemo,
+  getProductByCategory_id,
+  searchProducts,
+  addToCart,
 };
