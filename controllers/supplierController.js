@@ -1,20 +1,13 @@
 const asyncHandler = require("express-async-handler");
-const cookie = require("cookie");
-const axios = require("axios");
-const bcrypt = require("bcryptjs");
 // const moment = require("moment-timezone");
-const { User, NotificationMessages, AdminDashboard, WebNotification } = require("../models/userModel.js");
+const { User } = require("../models/userModel.js");
 const dotenv = require("dotenv");
-const baseURL = process.env.BASE_URL;
 const ErrorHandler = require("../utils/errorHandler.js");
-const http = require("https");
 const Course = require("../models/course.js");
-const ConnectyCube = require("connectycube");
 const upload = require("../middleware/uploadMiddleware.js");
 const fs = require("fs");
-const { addDays, isWeekend, addMonths, getMonth, getDay } = require("date-fns");
+const { addDays, isWeekend } = require("date-fns");
 const moment = require("moment-business-days");
-const { log } = require("util");
 const TeacherPayment = require("../models/TeacherPaymentModel.js");
 
 dotenv.config();
@@ -192,7 +185,7 @@ function deleteFile(filePath) {
   });
 }
 
-const addCourse = asyncHandler(async (req, res) => {
+const addProduct = asyncHandler(async (req, res) => {
   req.uploadPath = "uploads/course";
   upload.single("course_image")(req, res, async (err) => {
     if (err) {
@@ -544,4 +537,4 @@ const calculateEndDate = (startDate, daysToAdd) => {
   return currentDay.toISOString().split("T")[0];
 };
 
-module.exports = { updateTeacherProfileData, addCourse, getTodayCourse, getMyClasses, getTeacherProfileData, updateCourseDates };
+module.exports = { updateTeacherProfileData, addProduct, getTodayCourse, getMyClasses, getTeacherProfileData, updateCourseDates };

@@ -26,15 +26,8 @@ const { notFound, errorHandler } = require("./middleware/errorMiddleware.js");
 const cors = require("cors");
 const path = require("path");
 const { subCategoryRoutes } = require("./routes/subCategoryRoutes.js");
-const { teacherRoutes } = require("./routes/teacherRoutes.js");
+const { supplierRoutes } = require("./routes/supplierRoutes.js");
 const { teacherNotificationsRoutes } = require("./routes/teacherNotificationRoutes.js");
-// const serviceAccount = require("./serviceAccountKey.json");
-
-// const admin = require("firebase-admin");
-// admin.initializeApp({
-//   credential: admin.credential.cert(serviceAccount),
-// });
-
 require("dotenv").config();
 
 // --------------------------Firebase Admin SDK------------------------------
@@ -57,7 +50,7 @@ app.use(
 // --------------------------Routes------------------------------
 
 app.use("/api/user", userRoutes);
-app.use("/api/teacher", teacherRoutes);
+app.use("/api/supplier", supplierRoutes);
 app.use("/api/teacherNotification", teacherNotificationsRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/message", messageRoutes);

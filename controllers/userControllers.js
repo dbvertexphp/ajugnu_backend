@@ -185,12 +185,9 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(err.message, 400));
     }
 
-    const { first_name, last_name, email, mobile, password, cpassword, role, firebase_token } = req.body;
-    if (!first_name || !last_name || !email || !mobile || !password || !cpassword || !role) {
+    const { full_name, email, mobile, password, role, firebase_token, pin_code } = req.body;
+    if (!full_name || !email || !mobile || !password || !role) {
       return next(new ErrorHandler("Please enter all the required fields.", 400));
-    }
-    if (password !== cpassword) {
-      return next(new ErrorHandler("Password and Confirm Password do not match.", 400));
     }
 
     const mobileExists = await User.findOne({ mobile });
@@ -205,30 +202,24 @@ const registerUser = asyncHandler(async (req, res, next) => {
 
     // Generate a 4-digit random OTP
     const otp = generateOTP();
-    const full_name = `${first_name} ${last_name}`;
-
-    //const { token, id } = await createConnectyCubeUser(mobile, password, email, full_name, role);
 
     // Get the profile picture path if uploaded
     const profile_pic = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
 
     const user = await User.create({
-      first_name,
-      last_name,
+      full_name,
       email,
       mobile,
       role,
       password,
       otp, // Add the OTP field
-      full_name,
       firebase_token,
+      pin_code,
       profile_pic, // Add profile_pic field
-      // ConnectyCube_token: token,
-      // ConnectyCube_id: id,
     });
 
     if (user) {
-      sendOTP(full_name, mobile, otp);
+      // sendOTP(full_name, mobile, otp);
       try {
         const adminDashboard = await AdminDashboard.findOne();
         if (adminDashboard) {
@@ -243,17 +234,15 @@ const registerUser = asyncHandler(async (req, res, next) => {
 
       res.status(201).json({
         _id: user._id,
-        first_name: user.first_name,
-        last_name: user.last_name,
+        full_name: user.full_name,
         email: user.email,
         mobile: user.mobile,
         role: user.role,
         otp_verified: user.otp_verified,
         otp: user.otp,
         firebase_token,
+        pin_code,
         profile_pic: user.profile_pic, // Include profile_pic in response
-        // ConnectyCube_token: user.ConnectyCube_token,
-        // ConnectyCube_id: user.ConnectyCube_id,
         token: generateToken(user._id),
         status: true,
       });
@@ -279,7 +268,7 @@ const authUser = asyncHandler(async (req, res) => {
 
   if (userdata.otp_verified === 0) {
     const otp = generateOTP();
-    sendOTP(userdata.full_name, mobile, otp);
+    // sendOTP(userdata.full_name, mobile, otp);
     await User.updateOne({ _id: userdata._id }, { $set: { otp } });
     // throw new ErrorHandler("OTP Not verified", 400);
     res.status(400).json({
@@ -370,18 +359,12 @@ const verifyOtp = asyncHandler(async (req, res) => {
       throw new ErrorHandler("Invalid OTP.", 400);
     }
 
-    // Create ConnectyCube user after OTP is verified
-    const { token, id } = await createConnectyCubeUser(mobile, user.password, user.email, user.full_name, user.role);
-
     // Update the user's otp_verified field to 1 (OTP verified)
-    // Update the user's otp_verified field and ConnectyCube credentials
     const result = await User.updateOne(
       { _id: user._id },
       {
         $set: {
           otp_verified: 1,
-          ConnectyCube_token: token,
-          ConnectyCube_id: id,
         },
       }
     );
@@ -417,7 +400,7 @@ const resendOTP = asyncHandler(async (req, res) => {
   const user = await User.findOne({ mobile });
 
   //   const type = "Resend";
-  sendOTP(user.first_name, mobile, newOTP);
+  // sendOTP(user.first_name, mobile, newOTP);
   if (!user) {
     throw new ErrorHandler("User Not Found. ", 400);
   }
@@ -594,26 +577,32 @@ const forgetPassword = asyncHandler(async (req, res) => {
     return;
   }
 
-  user.password = newPassword;
-
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(newPassword, salt);
 
   const result = await User.updateOne({ _id: user._id }, { $set: { password: hashedPassword } });
+  if (result.nModified === 1) {
+    // Fetch the updated user
+    const updatedUser = await User.findById(user._id);
 
-  // Save the updated user with the new password
-  res.json({
-    message: "Password reset successfully.",
-    updateUser: result,
-    status: true,
-  });
+    res.status(200).json({
+      message: "Password reset successfully.",
+      updatedUser,
+      status: true,
+    });
+  } else {
+    res.status(500).json({
+      message: "Password reset failed.",
+      status: false,
+    });
+  }
 });
 
 const ChangePassword = asyncHandler(async (req, res, next) => {
   const userId = req.headers.userID; // Assuming you have user authentication middleware
-  const { newPassword, confirmPassword } = req.body;
+  const { oldPassword, newPassword, confirmPassword } = req.body;
 
-  if (!newPassword || !confirmPassword || !userId) {
+  if (!oldPassword || !newPassword || !confirmPassword || !userId) {
     return next(new ErrorHandler("Please enter all the required fields.", 400));
   }
 
@@ -625,7 +614,13 @@ const ChangePassword = asyncHandler(async (req, res, next) => {
   const user = await User.findById(userId);
 
   if (!user) {
-    return next(new ErrorHandler("User Not Found.", 400));
+    return next(new ErrorHandler("User Not Found.", 404));
+  }
+
+  // Check if the old password is correct
+  const isMatch = await bcrypt.compare(oldPassword, user.password);
+  if (!isMatch) {
+    return next(new ErrorHandler("Old password is incorrect.", 400));
   }
 
   // Hash the new password
@@ -636,8 +631,12 @@ const ChangePassword = asyncHandler(async (req, res, next) => {
   try {
     const result = await User.updateOne({ _id: user._id }, { $set: { password: hashedPassword } });
 
-    res.status(201).json({
+    // Fetch the updated user
+    const updatedUser = await User.findById(user._id);
+
+    res.status(200).json({
       message: "Password changed successfully.",
+      updatedUser,
       status: true,
     });
   } catch (error) {
@@ -729,8 +728,8 @@ const getAllUsers = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    const users = await User.find({ role: "student" }).skip(skip).limit(Number(limit));
-    const totalUsers = await User.countDocuments({ role: "student" });
+    const users = await User.find({ role: "user" }).skip(skip).limit(Number(limit));
+    const totalUsers = await User.countDocuments({ role: "user" });
 
     const transformedUsersPromises = users.map(async (user) => {
       let transformedUser = { ...user.toObject() };
@@ -851,62 +850,30 @@ const getAllTeachers = asyncHandler(async (req, res) => {
   }
 });
 
-const getAllTeachersInAdmin = asyncHandler(async (req, res) => {
+const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
   try {
-    const query = { role: "teacher" }; // Condition added to fetch only teachers
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    const users = await User.find(query).populate({
-      path: "payment_id",
-    });
+    // Search keyword from query params
+    const searchKeyword = req.query.search || "";
 
-    // Map each user to an array of promises
-    const transformedUsersPromises = users.map(async (user) => {
-      let transformedUser = { ...user.toObject() }; // Convert Mongoose document to plain JavaScript object
-      if (transformedUser.pic) {
-        const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
-        transformedUser.pic = getSignedUrl_pic;
-      }
-      if (transformedUser.watch_time) {
-        transformedUser.watch_time = convertSecondsToReadableTimeAdmin(transformedUser.watch_time);
-      }
+    const query = {
+      role: "supplier",
+      $or: [{ full_name: { $regex: searchKeyword, $options: "i" } }],
+    };
 
-      // Determine the payment type dynamically based on payment_id
-      if (transformedUser.payment_id) {
-        let paymentType;
-        let paymentAmount;
+    const suppliers = await User.find(query).skip(skip).limit(limit);
 
-        if (transformedUser.payment_id.advance !== undefined) {
-          paymentType = "advance";
-          paymentAmount = transformedUser.payment_id.advance;
-        } else if (transformedUser.payment_id.master !== undefined) {
-          paymentType = "master";
-          paymentAmount = transformedUser.payment_id.master;
-        } else {
-          // Handle case where neither advance nor master is defined
-          paymentType = null;
-          paymentAmount = null;
-        }
-
-        transformedUser.payment = {
-          type: paymentType,
-          amount: paymentAmount,
-        };
-        delete transformedUser.payment_id; // Remove payment_id from the user object
-      } else {
-        transformedUser.payment = {
-          type: null,
-          amount: null,
-        };
-      }
-
-      return { user: transformedUser };
-    });
-
-    // Execute all promises concurrently
-    const transformedUsers = await Promise.all(transformedUsersPromises);
+    const totalSuppliers = await User.countDocuments(query);
 
     res.json({
-      Users: transformedUsers,
+      Suppliers: suppliers,
+
+      total_rows: totalSuppliers,
+      current_page: page,
+      total_pages: Math.ceil(totalSuppliers / limit),
     });
   } catch (error) {
     console.error(error);
@@ -2710,7 +2677,7 @@ module.exports = {
   updateStudentProfileData,
   getStudentsPayment,
   getTotalAmount,
-  getAllTeachersInAdmin,
+  getAllSuppliersInAdmin,
   updateCourseWithDemoId,
   askForDemo,
 };

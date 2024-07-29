@@ -54,7 +54,7 @@ const {
   updateStudentProfileData,
   getStudentsPayment,
   getTotalAmount,
-  getAllTeachersInAdmin,
+  getAllSuppliersInAdmin,
   updateCourseWithDemoId,
   askForDemo,
 } = require("../controllers/userControllers.js");
@@ -162,6 +162,6 @@ userRoutes.route("/getAllHireList").post(protect, getAllHireList);
 userRoutes.route("/updateProfileDataByAdmin").post(protect, updateProfileDataByAdmin);
 userRoutes.route("/getCoursesByTeacherId/:teacher_id").get(protect, getCoursesByTeacherId);
 
-userRoutes.route("/getAllTeachersInAdmin").get(protect, getAllTeachersInAdmin);
+userRoutes.route("/getAllSuppliersInAdmin").get(protect, getAllSuppliersInAdmin);
 
 module.exports = { userRoutes };

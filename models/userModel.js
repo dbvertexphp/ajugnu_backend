@@ -8,39 +8,21 @@ const moments = require("moment");
 const { getSignedUrlS3 } = require("../config/aws-s3.js");
 
 const userSchema = mongoose.Schema({
-  first_name: { type: String, required: true },
-  last_name: { type: String, required: true },
   full_name: { type: String },
   email: {
     type: String,
-    match: /^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/,
   },
   mobile: { type: Number, unique: true },
   password: { type: String, required: true },
-  cpassword: { type: String },
-  role: { type: String, required: true },
+  role: { type: String, required: true, enum: ["user", "supplier"] },
   otp: { type: String },
   otp_verified: { type: Number, default: 0 },
   firebase_token: { type: String, default: "dummy_token" },
+  pin_code: { type: Number, default: null },
   profile_pic: {
     type: String,
   },
-  background_image: {
-    type: String,
-    required: false,
-  },
-  ConnectyCube_token: { type: String, default: null },
-  ConnectyCube_id: { type: String, default: null },
-  experience: { type: String },
-  education: { type: String },
-  languages: [{ type: String, max: 4 }], // Maximum 4 languages
-  expertise: { type: String },
-  about_me: { type: String },
-  averageRating: { type: Number, default: 0 },
-  ratingCount: { type: Number, default: 0 },
-  payment_id: { type: mongoose.Schema.Types.ObjectId, default: null, ref: "TeacherPayment" },
-  firebase_token: { type: String, default: null },
-  missingDays: { type: Number, default: 21, required: true },
+  address: { type: String },
   datetime: {
     type: String,
     default: () => moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
