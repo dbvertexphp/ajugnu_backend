@@ -13,9 +13,7 @@ const productSchema = new Schema(
     other_name: {
       type: String,
     },
-    product_image: {
-      type: String,
-    },
+    product_images: [String],
     category_id: {
       type: Schema.Types.ObjectId,
       ref: "Category",
@@ -49,6 +47,14 @@ const productSchema = new Schema(
       required: true,
     },
     pin_code: [Number],
+    averageRating: {
+      type: Number,
+      default: 0,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

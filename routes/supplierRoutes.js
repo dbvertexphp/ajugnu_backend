@@ -1,12 +1,16 @@
 const express = require("express");
 const protect = require("../middleware/authMiddleware.js");
 const Authorization = require("../middleware/Authorization.middleware.js");
-const { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode } = require("../controllers/supplierController.js");
+const { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct } = require("../controllers/supplierController.js");
 
 const supplierRoutes = express.Router();
 
 // Apply protect and Authorization middleware to updateTeacherProfile route
 supplierRoutes.post("/addProduct", protect, Authorization(["supplier", "admin"]), addProduct);
+
+supplierRoutes.post("/editProduct", protect, Authorization(["supplier", "admin"]), editProduct);
+
+supplierRoutes.post("/deleteProduct", protect, Authorization(["supplier", "admin"]), deleteProduct);
 
 supplierRoutes.get("/getProducts", protect, Authorization(["supplier"]), getProducts);
 

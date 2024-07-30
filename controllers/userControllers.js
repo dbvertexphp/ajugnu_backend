@@ -23,6 +23,7 @@ const jwt = require("jsonwebtoken");
 const upload = require("../middleware/uploadMiddleware.js");
 const Product = require("../models/productModel.js");
 const Cart = require("../models/cartModel.js");
+const Order = require("../models/orderModel.js");
 const TeacherPayment = require("../models/TeacherPaymentModel.js");
 const Favorite = require("../models/favorite.js");
 const Rating = require("../models/ratingModel.js");
@@ -784,6 +785,34 @@ const removeFavoriteProduct = asyncHandler(async (req, res) => {
   }
 });
 
+const getFavoriteProduct = asyncHandler(async (req, res) => {
+  const userID = req.headers.userID;
+
+  try {
+    // Validate userID
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Find all favorite products for the user
+    const favorites = await Favorite.find({ user_id: userID }).populate("product_id");
+
+    if (!favorites.length) {
+      return res.status(404).json({ message: "No favorite products found", status: false });
+    }
+
+    // Return success response
+    res.status(200).json({
+      status: true,
+      message: "Favorite products retrieved successfully",
+      favorites,
+    });
+  } catch (error) {
+    console.error("Error getting favorite products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // Define the addToCart function
 const addToCart = asyncHandler(async (req, res) => {
   const { product_id, quantity } = req.body;
@@ -806,6 +835,10 @@ const addToCart = asyncHandler(async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: "Product not found", status: false });
     }
+    // Check if the requested quantity exceeds available stock
+    if (quantity > product.quantity) {
+      return res.status(400).json({ message: "Requested quantity exceeds available stock", status: false });
+    }
 
     // Check if the product is already in the cart
     let cartItem = await Cart.findOne({ user_id: userID, product_id: product_id });
@@ -818,6 +851,7 @@ const addToCart = asyncHandler(async (req, res) => {
         user_id: userID,
         product_id: product_id,
         quantity: quantity,
+        supplier_id: product.supplier_id,
       });
     }
 
@@ -832,6 +866,360 @@ const addToCart = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error("Error adding product to cart:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const removeFromCart = asyncHandler(async (req, res) => {
+  const { product_id } = req.body;
+  const userID = req.headers.userID;
+
+  try {
+    // Validate product_id and userID
+    if (!product_id) {
+      return res.status(400).json({ message: "Product ID is required", status: false });
+    }
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Check if the product is in the cart
+    const cartItem = await Cart.findOne({ user_id: userID, product_id: product_id });
+    if (!cartItem) {
+      return res.status(404).json({ message: "Product not found in cart", status: false });
+    }
+
+    // Remove the product from the cart
+    await Cart.deleteOne({ user_id: userID, product_id: product_id });
+
+    // Return success response
+    res.status(200).json({
+      status: true,
+      message: "Product removed from cart successfully",
+    });
+  } catch (error) {
+    console.error("Error removing product from cart:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const getProductDetailByProductId = asyncHandler(async (req, res) => {
+  const { product_id } = req.body;
+
+  try {
+    // Validate product_id
+    if (!product_id) {
+      return res.status(400).json({ message: "Product ID is required", status: false });
+    }
+
+    // Find the product by ID
+    const product = await Product.findById(product_id);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
+
+    // Return success response
+    res.status(200).json({
+      status: true,
+      message: "Product details retrieved successfully",
+      product,
+    });
+  } catch (error) {
+    console.error("Error getting product details:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const getCartProducts = asyncHandler(async (req, res) => {
+  const userID = req.headers.userID;
+
+  try {
+    // Validate userID
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Find all cart items for the user
+    const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+
+    if (!cartItems || cartItems.length === 0) {
+      return res.status(404).json({ message: "No items found in cart", status: false });
+    }
+
+    // Calculate total amount
+    let totalAmount = 0;
+    cartItems.forEach((item) => {
+      totalAmount += item.product_id.price * item.quantity;
+    });
+
+    // Return success response
+    res.status(200).json({
+      status: true,
+      message: "Cart items retrieved successfully",
+      cartItems,
+      totalAmount,
+    });
+  } catch (error) {
+    console.error("Error getting cart items:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const increaseCartQuantity = asyncHandler(async (req, res) => {
+  const { product_id, quantity } = req.body;
+  const userID = req.headers.userID;
+
+  try {
+    // Validate inputs
+    if (!product_id) {
+      return res.status(400).json({ message: "Product ID is required", status: false });
+    }
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ message: "Quantity should be a positive number", status: false });
+    }
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Check if the cart item exists
+    let cartItem = await Cart.findOne({ user_id: userID, product_id: product_id });
+    if (!cartItem) {
+      return res.status(404).json({ message: "Product not found in cart", status: false });
+    }
+
+    // Check if the requested quantity exceeds available stock
+    const product = await Product.findById(product_id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
+    if (cartItem.quantity + quantity > product.quantity) {
+      return res.status(400).json({ message: "Requested quantity exceeds available stock", status: false });
+    }
+
+    // Update the quantity
+    cartItem.quantity += quantity;
+    await cartItem.save();
+
+    // Return success response
+    res.status(200).json({
+      status: true,
+      message: "Cart quantity increased successfully",
+      cartItem,
+    });
+  } catch (error) {
+    console.error("Error increasing cart quantity:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const decreaseCartQuantity = asyncHandler(async (req, res) => {
+  const { product_id, quantity } = req.body;
+  const userID = req.headers.userID;
+
+  try {
+    // Validate inputs
+    if (!product_id) {
+      return res.status(400).json({ message: "Product ID is required", status: false });
+    }
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ message: "Quantity should be a positive number", status: false });
+    }
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Check if the cart item exists
+    let cartItem = await Cart.findOne({ user_id: userID, product_id: product_id });
+    if (!cartItem) {
+      return res.status(404).json({ message: "Product not found in cart", status: false });
+    }
+
+    // Ensure the quantity to be decreased is valid
+    if (cartItem.quantity - quantity < 1) {
+      return res.status(400).json({ message: "Quantity cannot be less than 1", status: false });
+    }
+
+    // Decrease the quantity
+    cartItem.quantity -= quantity;
+    await cartItem.save();
+
+    // Return success response
+    res.status(200).json({
+      status: true,
+      message: "Cart quantity decreased successfully",
+      cartItem,
+    });
+  } catch (error) {
+    console.error("Error decreasing cart quantity:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const checkout = asyncHandler(async (req, res) => {
+  const userID = req.headers.userID;
+  const { shipping_address, payment_method } = req.body;
+
+  try {
+    // Validate userID, shipping_address, and payment_method
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+    if (!shipping_address || !shipping_address.name || !shipping_address.address || !shipping_address.pincode || !shipping_address.mobile_number) {
+      return res.status(400).json({ message: "Complete shipping address is required", status: false });
+    }
+    if (!payment_method || !["online", "cod"].includes(payment_method)) {
+      return res.status(400).json({ message: "Valid payment method is required", status: false });
+    }
+
+    // Find all cart items for the user
+    const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+
+    if (!cartItems || cartItems.length === 0) {
+      return res.status(404).json({ message: "No items found in cart", status: false });
+    }
+
+    // Calculate total amount and validate stock
+    let totalAmount = 0;
+    const verificationCodes = {};
+
+    const items = cartItems.map((item) => {
+      if (item.quantity > item.product_id.quantity) {
+        return res.status(400).json({ message: `Requested quantity for ${item.product_id.english_name} exceeds available stock`, status: false });
+      }
+      totalAmount += item.product_id.price * item.quantity;
+
+      // Generate a unique verification code for each supplier_id
+      const supplierId = item.product_id.supplier_id.toString();
+      if (!verificationCodes[supplierId]) {
+        verificationCodes[supplierId] = generateVerificationCode();
+      }
+
+      return {
+        product_id: item.product_id._id,
+        quantity: item.quantity,
+        supplier_id: supplierId,
+        verification_code: verificationCodes[supplierId], // Add verification code to each item
+        status: "pending", // Default status for each item
+      };
+    });
+
+    // Generate a unique order ID
+    const orderId = generateOrderID();
+
+    // Create new order
+    const order = new Order({
+      order_id: orderId,
+      user_id: userID,
+      items,
+      shipping_address,
+      payment_method,
+      total_amount: totalAmount,
+    });
+
+    const savedOrder = await order.save();
+
+    // Update product stock and clear user's cart
+    for (const item of cartItems) {
+      await Product.findByIdAndUpdate(item.product_id._id, { $inc: { quantity: -item.quantity } });
+    }
+    await Cart.deleteMany({ user_id: userID });
+
+    res.status(201).json({
+      status: true,
+      message: "Order placed successfully",
+      order: savedOrder,
+    });
+  } catch (error) {
+    console.error("Error during checkout:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const generateVerificationCode = () => {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return code;
+};
+
+const generateOrderID = () => {
+  const randomNumber = Math.floor(Math.random() * 10000000); // Generate a number between 0 and 9999999
+  return `#${randomNumber.toString().padStart(7, "0")}`; // Pad with leading zeros to ensure it has 7 digits
+};
+
+const getUserOrderDetails = asyncHandler(async (req, res) => {
+  const userID = req.headers.userID;
+
+  try {
+    // Validate userID
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Find all orders for the user
+    const orders = await Order.find({ user_id: userID }).populate({
+      path: "items.product_id",
+      populate: {
+        path: "supplier_id",
+        select: "full_name", // Assuming supplier schema has a field 'full_name'
+      },
+    });
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ message: "No orders found for this user", status: false });
+    }
+
+    // Organize order details
+    const response = orders.map((order) => {
+      const supplierDetails = {};
+      order.items.forEach((item) => {
+        const supplierId = item.supplier_id.toString();
+        if (!supplierDetails[supplierId]) {
+          supplierDetails[supplierId] = {
+            total_amount: 0,
+            full_name: item.product_id.supplier_id.full_name,
+            verification_code: item.verification_code,
+            products: [],
+          };
+        }
+
+        supplierDetails[supplierId].total_amount += item.product_id.price * item.quantity;
+        supplierDetails[supplierId].products.push({
+          product_id: item.product_id._id,
+          quantity: item.quantity,
+          price: item.product_id.price,
+          product_image: item.product_id.product_image,
+          product_name: item.product_id.english_name,
+        });
+      });
+
+      return {
+        _id: order._id,
+        order_id: order.order_id,
+        order_status: order.status,
+        payment_method: order.payment_method,
+        created_at: order.createdAt,
+        updated_at: order.updatedAt,
+        details: Object.keys(supplierDetails).map((supplierId) => ({
+          supplier_id: supplierId,
+          full_name: supplierDetails[supplierId].full_name,
+          verification_code: supplierDetails[supplierId].verification_code,
+          total_amount: supplierDetails[supplierId].total_amount,
+          products: supplierDetails[supplierId].products,
+        })),
+      };
+    });
+
+    res.status(200).json({
+      status: true,
+      message: "User order details fetched successfully",
+      orders: response,
+    });
+  } catch (error) {
+    console.error("Error fetching user order details:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -1849,4 +2237,12 @@ module.exports = {
   getProductByCategory_id,
   searchProducts,
   addToCart,
+  removeFromCart,
+  getFavoriteProduct,
+  getProductDetailByProductId,
+  getCartProducts,
+  increaseCartQuantity,
+  decreaseCartQuantity,
+  checkout,
+  getUserOrderDetails,
 };

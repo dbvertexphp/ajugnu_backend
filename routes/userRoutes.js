@@ -36,6 +36,14 @@ const {
   getProductByCategory_id,
   searchProducts,
   addToCart,
+  getFavoriteProduct,
+  getProductDetailByProductId,
+  getCartProducts,
+  increaseCartQuantity,
+  decreaseCartQuantity,
+  checkout,
+  removeFromCart,
+  getUserOrderDetails,
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -65,11 +73,19 @@ userRoutes.route("/searchProducts").post(protect, Authorization(["user"]), searc
 userRoutes.route("/addFavoriteProduct").post(protect, Authorization(["user"]), addFavoriteProduct);
 userRoutes.route("/removeFavoriteProduct").post(protect, Authorization(["user"]), removeFavoriteProduct);
 userRoutes.route("/addToCart").post(protect, Authorization(["user"]), addToCart);
+userRoutes.route("/getFavoriteProduct").get(protect, Authorization(["user"]), getFavoriteProduct);
+userRoutes.route("/getProductDetailByProductId").post(protect, Authorization(["user"]), getProductDetailByProductId);
+userRoutes.route("/getCartProducts").get(protect, Authorization(["user"]), getCartProducts);
+userRoutes.route("/increaseCartQuantity").post(protect, Authorization(["user"]), increaseCartQuantity);
+userRoutes.route("/decreaseCartQuantity").post(protect, Authorization(["user"]), decreaseCartQuantity);
+userRoutes.route("/checkout").post(protect, Authorization(["user"]), checkout);
+userRoutes.route("/removeFromCart").post(protect, Authorization(["user"]), removeFromCart);
+userRoutes.route("/getUserOrderDetails").get(protect, Authorization(["user"]), getUserOrderDetails);
+userRoutes.route("/addRating").post(protect, Authorization(["user"]), addRating);
 
 userRoutes.route("/getCoursesByUserId").get(protect, Authorization(["student"]), getCoursesByUserId);
 userRoutes.route("/getAllUsers").get(protect, Authorization(["student", "admin"]), getAllUsers);
 userRoutes.route("/getFavoriteTeachers").get(protect, Authorization(["student"]), getFavoriteTeachers);
-userRoutes.route("/addRating").post(protect, Authorization(["student"]), addRating);
 userRoutes.route("/getRatingsByTeacherId/:teacherId").get(protect, getRatingsByTeacherId);
 userRoutes.route("/addReview").post(protect, Authorization(["student"]), addReview);
 

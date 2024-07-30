@@ -4,39 +4,45 @@ const asyncHandler = require("express-async-handler");
 const Rating = require("../models/ratingModel.js");
 const mongoose = require("mongoose");
 const { User } = require("../models/userModel.js");
+const Product = require("../models/productModel");
 
 // Controller function to add a rating
 const addRating = asyncHandler(async (req, res) => {
-  const { teacher_id, rating, message } = req.body;
+  const { product_id, rating, message } = req.body;
   const user_id = req.headers.userID; // Assuming user ID is obtained from authentication middleware
 
   try {
-    // Check if the user has already rated the teacher
-    const existingRating = await Rating.findOne({ teacher_id, user_id });
-
-    if (existingRating) {
-      return res.status(400).json({ message: "You have already rated this teacher." });
+    // Validate input
+    if (!product_id || !rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Invalid product ID or rating value." });
     }
 
-    // If no existing rating found, create a new rating
-    const newRating = await Rating.create({ teacher_id, user_id, rating, message });
+    // Check if the user has already rated the product
+    const existingRating = await Rating.findOne({ product_id, user_id });
 
-    // Find the teacher to update their average rating
-    const teacher = await User.findById(teacher_id);
+    if (existingRating) {
+      return res.status(400).json({ message: "You have already rated this product." });
+    }
 
-    if (!teacher) {
-      return res.status(404).json({ message: "Teacher not found" });
+    // Create a new rating
+    const newRating = await Rating.create({ product_id, user_id, rating, message });
+
+    // Find the product to update its average rating
+    const product = await Product.findById(product_id);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
 
     // Calculate the new average rating
-    const totalRating = teacher.averageRating * teacher.ratingCount + rating;
-    const newRatingCount = teacher.ratingCount + 1;
+    const totalRating = product.averageRating * product.ratingCount + rating;
+    const newRatingCount = product.ratingCount + 1;
     const newAverageRating = totalRating / newRatingCount;
 
-    // Update the teacher's average rating and rating count
-    teacher.averageRating = newAverageRating;
-    teacher.ratingCount = newRatingCount;
-    await teacher.save();
+    // Update the product's average rating and rating count
+    product.averageRating = newAverageRating;
+    product.ratingCount = newRatingCount;
+    await product.save();
 
     res.status(201).json({ rating: newRating, averageRating: newAverageRating });
   } catch (error) {

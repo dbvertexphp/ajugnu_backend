@@ -5,9 +5,9 @@ const Schema = mongoose.Schema;
 
 const ratingSchema = new Schema(
   {
-    teacher_id: {
+    product_id: {
       type: Schema.Types.ObjectId,
-      ref: "User", // Assuming "User" model is used for teachers
+      ref: "Product", // Assuming "User" model is used for teachers
       required: true,
     },
     user_id: {

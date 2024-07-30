@@ -143,7 +143,7 @@ function deleteFile(filePath) {
 
 const addProduct = asyncHandler(async (req, res, next) => {
   req.uploadPath = "uploads/product";
-  upload.single("product_image")(req, res, async (err) => {
+  upload.array("product_images")(req, res, async (err) => {
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
@@ -159,8 +159,6 @@ const addProduct = asyncHandler(async (req, res, next) => {
           status: false,
         });
       }
-      // Get the profile picture path if uploaded
-      const product_image = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
 
       // Handle pin_code as an array
       const pinCodesArray = pin_code ? (Array.isArray(pin_code) ? pin_code : [pin_code]) : [];
@@ -179,9 +177,12 @@ const addProduct = asyncHandler(async (req, res, next) => {
         return res.status(400).json({ message: `Invalid pin codes: ${invalidPinCodes.join(", ")}`, status: false });
       }
 
+      // Get the profile picture path if uploaded
+      const product_images = req.files && req.files.length > 0 ? req.files[0].filename : null;
+
       // Create new Product with parsed dates
       const newProduct = new Product({
-        product_image,
+        product_images: product_images ? `${req.uploadPath}/${product_images}` : null,
         english_name,
         local_name,
         other_name,
@@ -218,6 +219,132 @@ const addProduct = asyncHandler(async (req, res, next) => {
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
+});
+
+const editProduct = asyncHandler(async (req, res, next) => {
+  req.uploadPath = "uploads/product";
+  upload.single("product_image")(req, res, async (err) => {
+    if (err) {
+      return next(new ErrorHandler(err.message, 400));
+    }
+
+    const { product_id, english_name, local_name, other_name, category_id, price, quantity, product_type, product_size, description, pin_code } = req.body;
+    const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
+
+    try {
+      // Validate required fields
+      if (!product_id || !english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !supplier_id || !pin_code) {
+        return res.status(400).json({
+          message: "All fields (product_id, english_name, price, quantity, product_type, product_size, description, category_id) are required.",
+          status: false,
+        });
+      }
+
+      // Fetch the product to be updated
+      const product = await Product.findById(product_id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found", status: false });
+      }
+
+      // Check if the supplier_id matches
+      if (product.supplier_id.toString() !== supplier_id) {
+        return res.status(403).json({ message: "You do not have permission to edit this product", status: false });
+      }
+
+      // Handle pin_code as an array
+      const pinCodesArray = pin_code ? (Array.isArray(pin_code) ? pin_code : [pin_code]) : [];
+
+      // Fetch user data to validate pin codes
+      const user = await User.findById(supplier_id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found", status: false });
+      }
+
+      const userPinCodes = user.pin_code || [];
+
+      // Check if provided pin codes exist in the user's pin_code array
+      const invalidPinCodes = pinCodesArray.filter((pin) => !userPinCodes.includes(pin));
+      if (invalidPinCodes.length > 0) {
+        return res.status(400).json({ message: `Invalid pin codes: ${invalidPinCodes.join(", ")}`, status: false });
+      }
+
+      // Update product fields
+      product.english_name = english_name;
+      product.local_name = local_name || product.local_name;
+      product.other_name = other_name || product.other_name;
+      product.category_id = category_id;
+      product.price = price;
+      product.quantity = quantity;
+      product.product_type = product_type;
+      product.product_size = product_size;
+      product.description = description;
+      product.pin_code = pinCodesArray;
+
+      // Update the product image if a new file is uploaded
+      if (req.file) {
+        product.product_image = `${req.uploadPath}/${req.file.filename}`;
+      }
+
+      const updatedProduct = await product.save();
+
+      res.status(200).json({
+        _id: updatedProduct._id,
+        product_image: updatedProduct.product_image,
+        english_name: updatedProduct.english_name,
+        local_name: updatedProduct.local_name,
+        other_name: updatedProduct.other_name,
+        category_id: updatedProduct.category_id,
+        price: updatedProduct.price,
+        quantity: updatedProduct.quantity,
+        product_type: updatedProduct.product_type,
+        product_size: updatedProduct.product_size,
+        description: updatedProduct.description,
+        supplier_id: updatedProduct.supplier_id,
+        pin_code: updatedProduct.pin_code,
+        status: true,
+      });
+    } catch (error) {
+      console.error("Error editing product:", error.message);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+});
+
+const deleteProduct = asyncHandler(async (req, res) => {
+  const { product_id } = req.body; // Product ID is provided in the URL
+  const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
+
+  try {
+    // Validate the product_id and supplier_id
+    if (!product_id || !supplier_id) {
+      return res.status(400).json({
+        message: "Product ID and Supplier ID are required.",
+        status: false,
+      });
+    }
+
+    // Find the product to be deleted
+    const product = await Product.findById(product_id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
+
+    // Check if the supplier_id matches
+    if (product.supplier_id.toString() !== supplier_id) {
+      return res.status(403).json({ message: "You do not have permission to delete this product", status: false });
+    }
+
+    // Delete the product
+    await Product.findByIdAndDelete(product_id);
+
+    res.status(200).json({
+      message: "Product deleted successfully.",
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error deleting product:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getProducts = asyncHandler(async (req, res) => {
@@ -271,4 +398,4 @@ const getPincode = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode };
+module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct };

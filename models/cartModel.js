@@ -18,6 +18,11 @@ const cartSchema = new Schema(
       required: true,
       default: 1,
     },
+    supplier_id: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
   { timestamps: true }
 );
