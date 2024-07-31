@@ -1,7 +1,7 @@
 const express = require("express");
 const protect = require("../middleware/authMiddleware.js");
 const Authorization = require("../middleware/Authorization.middleware.js");
-const { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus } = require("../controllers/supplierController.js");
+const { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId } = require("../controllers/supplierController.js");
 
 const supplierRoutes = express.Router();
 
@@ -13,6 +13,10 @@ supplierRoutes.post("/editProduct", protect, Authorization(["supplier", "admin"]
 supplierRoutes.post("/deleteProduct", protect, Authorization(["supplier", "admin"]), deleteProduct);
 
 supplierRoutes.get("/getProducts", protect, Authorization(["supplier"]), getProducts);
+
+supplierRoutes.get("/getAllProducts", protect, getAllProducts);
+
+supplierRoutes.post("/getProductsBySupplierId", protect, getProductsBySupplierId);
 
 supplierRoutes.get("/getPincode", protect, Authorization(["supplier"]), getPincode);
 

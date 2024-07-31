@@ -44,6 +44,8 @@ const {
   checkout,
   removeFromCart,
   getUserOrderDetails,
+  getAllOrders,
+  getUserOrderInAdmin,
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -97,6 +99,9 @@ userRoutes.route("/getBankDetailsAdmin/:teacher_id").get(protect, Authorization(
 userRoutes.route("/calculatePayment").post(protect, Authorization(["teacher"]), calculatePayment);
 
 /*------------- Admin apis --------------------- */
+userRoutes.route("/getAllOrders").get(protect, Authorization(["admin"]), getAllOrders);
+userRoutes.route("/getUserOrderInAdmin").post(protect, Authorization(["admin"]), getUserOrderInAdmin);
+
 userRoutes.route("/getTeacherPaymentStatuses").get(protect, Authorization(["admin"]), getTeacherPaymentStatuses);
 userRoutes.route("/getTeacherPaymentStatusById/:teacher_id").get(protect, Authorization(["admin"]), getTeacherPaymentStatusById);
 userRoutes.route("/addTeacherPaymentStatus").post(protect, Authorization(["admin"]), addTeacherPaymentStatus);

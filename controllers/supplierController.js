@@ -155,9 +155,9 @@ const addProduct = asyncHandler(async (req, res, next) => {
 
     try {
       // Validate required fields
-      if (!english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !supplier_id || !pin_code) {
+      if (!english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !pin_code) {
         return res.status(400).json({
-          message: "All fields (english_name, price, quantity, product_type, product_size, description, category_id, supplier_id, pin_code) are required.",
+          message: "All fields (english_name, price, quantity, product_type, product_size, description, category_id, pin_code) are required.",
           status: false,
         });
       }
@@ -391,6 +391,68 @@ const getProducts = asyncHandler(async (req, res) => {
   }
 });
 
+// Get all products with pagination, search, and sorting
+const getAllProducts = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const limit = parseInt(req.query.limit) || 10; // Number of products per page, default to 10
+  const search = req.query.search || ""; // Search term
+  const sortBy = req.query.sortBy || "createdAt"; // Field to sort by, default to 'createdAt'
+  const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
+
+  try {
+    const query = {
+      $or: [{ english_name: { $regex: search, $options: "i" } }, { description: { $regex: search, $options: "i" } }],
+    };
+
+    const totalProducts = await Product.countDocuments(query);
+    const products = await Product.find(query)
+      .sort({ [sortBy]: order })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.status(200).json({
+      products,
+      page,
+      totalPages: Math.ceil(totalProducts / limit),
+      totalProducts,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
+});
+
+const getProductsBySupplierId = asyncHandler(async (req, res) => {
+  const { supplier_id } = req.body; // Assuming user authentication middleware sets this header
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const limit = 10; // Number of products per page
+
+  try {
+    if (!supplier_id) {
+      return res.status(400).json({
+        message: "Supplier ID is required.",
+        status: false,
+      });
+    }
+
+    const skip = (page - 1) * limit;
+    const totalProducts = await Product.countDocuments({ supplier_id });
+    const products = await Product.find({ supplier_id }).skip(skip).limit(limit);
+
+    res.status(200).json({
+      products,
+      page,
+      totalPages: Math.ceil(totalProducts / limit),
+      totalProducts,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 const getProductById = asyncHandler(async (req, res) => {
   const { product_id } = req.body; // Assuming user authentication middleware sets this header
 
@@ -567,4 +629,4 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus };
+module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId };

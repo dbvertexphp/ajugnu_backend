@@ -1,207 +1,98 @@
-// controllers/transactionController.js
 const asyncHandler = require("express-async-handler");
 const Transaction = require("../models/transactionModel");
-const Course = require("../models/productModel");
-const baseURL = process.env.BASE_URL;
-const { User } = require("../models/userModel.js");
+const Order = require("../models/orderModel"); // Ensure correct import path
+const Product = require("../models/productModel");
+const { User } = require("../models/userModel");
 const { addNotification } = require("./teacherNotificationController");
 const { sendFCMNotification } = require("./notificationControllers");
 
 const addTransaction = asyncHandler(async (req, res) => {
   const user_id = req.headers.userID;
-  const { teacher_id, course_id, transaction_id, amount, payment_id, payment_status } = req.body;
+  const { order_id, transaction_id, payment_id, payment_status, total_amount } = req.body;
 
-  if (!user_id || !teacher_id || !course_id || !transaction_id || !amount || !payment_id || !payment_status) {
-    return res.status(400).json({ message: "Invalid input" });
+  if (!user_id || !order_id || !transaction_id || !payment_id || !payment_status || !total_amount) {
+    return res.status(400).json({ message: "Invalid input", status: false });
   }
 
   try {
-    const course = await Course.findById(course_id);
-
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
+    // Fetch the order details
+    const order = await Order.findById(order_id).populate("items.product_id");
+    if (!order) {
+      return res.status(404).json({ message: "Order not found", status: false });
     }
 
-    // Check if the user has already purchased the course
-    if (course.userIds.includes(user_id)) {
-      return res.status(400).json({
-        message: "You have already purchased this course",
-        status: false,
-      });
-    }
+    // Aggregate amount by supplier and product
+    const items = order.items.map((item) => ({
+      product_id: item.product_id._id,
+      supplier_id: item.supplier_id,
+      amount: item.quantity * item.product_id.price,
+    }));
 
-    // Check the type of course to determine maximum userIds allowed
-    const maxUserIdsAllowed = course.type === "group_course" ? 3 : 1;
-
-    if (course.userIds.length >= maxUserIdsAllowed) {
-      return res.status(400).json({
-        message: `Maximum capacity (${maxUserIdsAllowed}) reached for this course`,
-        status: false,
-      });
-    }
-
+    // Create a single transaction document
     const newTransaction = new Transaction({
       user_id,
-      teacher_id,
-      course_id,
+      order_id,
       transaction_id,
-      amount,
       payment_id,
       payment_status,
+      total_amount,
+      items,
     });
 
     const savedTransaction = await newTransaction.save();
 
-    // Update Course with userId if not already included
-    if (!course.userIds.includes(user_id)) {
-      course.userIds.push(user_id);
-      await course.save();
-    }
-
-    // Send notification to teacher
-    const teacher = await User.findById(teacher_id);
-    console.log(teacher);
-    if (teacher && teacher.firebase_token) {
-      const registrationToken = teacher.firebase_token;
-      const title = "New Course Purchase";
-      const body = `A new transaction has been made for the course: ${course.title}.`;
-      console.log(registrationToken);
-      const notificationResult = await sendFCMNotification(registrationToken, title, body);
-      if (notificationResult.success) {
-        console.log("Notification sent successfully:", notificationResult.response);
-      } else {
-        console.error("Failed to send notification:", notificationResult.error);
+    // Send notifications and add notifications for each supplier
+    for (const item of items) {
+      const supplier = await User.findById(item.supplier_id);
+      if (supplier && supplier.firebase_token) {
+        const registrationToken = supplier.firebase_token;
+        const title = "Product Purchase";
+        const body = `A new transaction of ${item.amount} has been made for your products.`;
+        const notificationResult = await sendFCMNotification(registrationToken, title, body);
+        if (notificationResult.success) {
+          console.log("Notification sent successfully:", notificationResult.response);
+        } else {
+          console.error("Failed to send notification:", notificationResult.error);
+        }
       }
+      await addNotification(user_id, item.supplier_id, "New Transaction", `Transaction ID: ${transaction_id}`, item.amount);
     }
-    // const adminUser = await User.findOne({ role: "admin" });
-
-    // if (adminUser && adminUser.firebase_token) {
-    //   const registrationToken = adminUser.firebase_token;
-    //   const title = "New Course Purchase";
-    //   const body = `A new transaction has been made for the course: ${course.title}.`;
-    //   console.log(registrationToken);
-    //   const notificationResult = await sendFCMNotification(registrationToken, title, body);
-    //   if (notificationResult.success) {
-    //     console.log("Notification sent successfully:", notificationResult.response);
-    //   } else {
-    //     console.error("Failed to send notification:", notificationResult.error);
-    //   }
-    // }
-
-    // // Add notification to the admin's notification collection
-    // if (adminUser) {
-    //   await addNotification(user_id, adminUser._id, "New Transaction", course.title, amount);
-    // }
-
-    // Add notification to the teacher's notification collection
-    await addNotification(user_id, teacher_id, "New Transaction", course.title, amount);
 
     res.status(201).json({
-      message: "Transaction added successfully",
+      message: "Transactions added successfully",
       transaction: savedTransaction,
     });
   } catch (error) {
-    console.error("Error adding transaction:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Error adding transactions:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
   }
 });
 
+// Get all transactions with optional filtering, sorting, and pagination
 const getAllTransactions = asyncHandler(async (req, res) => {
-  const { page = 1, search = "", Short = "" } = req.body;
-  const perPage = 10; // You can adjust this according to your requirements
-
-  // Build the query based on search (if any)
-  const query = {
-    $or: [
-      { "user_id.first_name": { $regex: search, $options: "i" } },
-      { "user_id.last_name": { $regex: search, $options: "i" } },
-      { "user_id.email": { $regex: search, $options: "i" } },
-      { "teacher_id.name": { $regex: search, $options: "i" } },
-      { "teacher_id.email": { $regex: search, $options: "i" } },
-      {
-        "teacher_id.first_name": {
-          $regex: search,
-          $options: "i",
-        },
-      },
-      { "teacher_id.last_name": { $regex: search, $options: "i" } },
-      { "course_id.title": { $regex: search, $options: "i" } },
-    ],
-  };
-
-  // Sorting based on Short field
-  let sortCriteria = {};
-  if (Short === "amount") {
-    sortCriteria = { amount: -1 }; // Sort by amount in descending order
-  } else {
-    sortCriteria = { _id: -1 }; // Default sorting
-  }
+  const { page = 1, limit = 10, sortBy = "createdAt", order = "desc" } = req.query;
 
   try {
+    // Fetch transactions with pagination
     const transactions = await Transaction.find()
-      .populate({
-        path: "user_id",
-        select: "full_name email", // Specify fields you want to populate
-      })
-      .populate({
-        path: "teacher_id",
-        select: "name email full_name",
-      })
-      .populate({
-        path: "course_id",
-        select: "title category_id type",
-        populate: {
-          path: "category_id",
-          select: "name",
-        },
-      })
-      .sort(sortCriteria)
-      .skip((page - 1) * perPage)
-      .limit(perPage);
+      .sort({ [sortBy]: order === "desc" ? -1 : 1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    // .populate("user_id order_id items.product_id items.supplier_id");
 
-    const totalCount = await Transaction.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / perPage);
+    // Count total number of transactions
+    const totalTransactions = await Transaction.countDocuments();
 
-    const paginationDetails = {
-      current_page: parseInt(page),
-      data: transactions,
-      first_page_url: `${baseURL}api/transactions?page=1`,
-      from: (page - 1) * perPage + 1,
-      last_page: totalPages,
-      last_page_url: `${baseURL}api/transactions?page=${totalPages}`,
-      links: [
-        {
-          url: page > 1 ? `${baseURL}api/transactions?page=${page - 1}` : null,
-          label: "&laquo; Previous",
-          active: false,
-        },
-        {
-          url: `${baseURL}api/transactions?page=${page}`,
-          label: page.toString(),
-          active: true,
-        },
-        {
-          url: page < totalPages ? `${baseURL}api/transactions?page=${page + 1}` : null,
-          label: "Next &raquo;",
-          active: false,
-        },
-      ],
-      next_page_url: page < totalPages ? `${baseURL}api/transactions?page=${page + 1}` : null,
-      path: `${baseURL}api/transactions`,
-      per_page: perPage,
-      prev_page_url: page > 1 ? `${baseURL}api/transactions?page=${page - 1}` : null,
-      to: (page - 1) * perPage + transactions.length,
-      total: totalCount,
-    };
-
-    res.json({
-      Transactions: paginationDetails,
-      page: page.toString(),
-      total_rows: totalCount,
+    res.status(200).json({
+      message: "Transactions fetched successfully",
+      transactions,
+      totalPages: Math.ceil(totalTransactions / limit),
+      currentPage: parseInt(page),
+      totalTransactions,
     });
   } catch (error) {
     console.error("Error fetching transactions:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error", status: false });
   }
 });
 

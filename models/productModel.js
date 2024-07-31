@@ -29,7 +29,7 @@ const productSchema = new Schema(
     },
     product_type: {
       type: String,
-      enum: ["indoor", "outdoor"],
+      enum: ["indoor", "outdoor", "office", "other"],
       required: true,
     },
     product_size: {

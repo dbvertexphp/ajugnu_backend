@@ -1150,6 +1150,134 @@ const generateOrderID = () => {
   return `#${randomNumber.toString().padStart(7, "0")}`; // Pad with leading zeros to ensure it has 7 digits
 };
 
+const getAllOrders = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const limit = parseInt(req.query.limit) || 10; // Number of orders per page, default to 10
+  const search = req.query.search || ""; // Search term
+  const sortBy = req.query.sortBy || "createdAt"; // Field to sort by, default to 'createdAt'
+  const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
+
+  try {
+    const query = search
+      ? {
+          $or: [
+            { "shipping_address.name": { $regex: search, $options: "i" } },
+            { "shipping_address.address": { $regex: search, $options: "i" } },
+            { "shipping_address.pincode": { $regex: search, $options: "i" } },
+            { "shipping_address.mobile_number": { $regex: search, $options: "i" } },
+            { payment_method: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const totalOrders = await Order.countDocuments(query);
+    const orders = await Order.find(query)
+      .sort({ [sortBy]: order })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate("user_id", "name email") // Populate user details
+      .populate("items.product_id", "name price") // Populate product details
+      .populate("items.supplier_id", "name"); // Populate supplier details
+
+    // Fetch payment status from the Transaction collection
+    const ordersWithPaymentStatus = await Promise.all(
+      orders.map(async (order) => {
+        const transaction = await Transaction.findOne({ order_id: order._id });
+        return {
+          ...order.toObject(),
+          payment_status: transaction ? transaction.payment_status : "unknown",
+        };
+      })
+    );
+
+    res.status(200).json({
+      orders: ordersWithPaymentStatus,
+      page,
+      totalPages: Math.ceil(totalOrders / limit),
+      totalOrders,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching orders:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
+});
+
+const getUserOrderInAdmin = asyncHandler(async (req, res) => {
+  const { userID } = req.body;
+
+  try {
+    // Validate userID
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    // Find all orders for the user
+    const orders = await Order.find({ user_id: userID }).populate({
+      path: "items.product_id",
+      populate: {
+        path: "supplier_id",
+        select: "full_name", // Assuming supplier schema has a field 'full_name'
+      },
+    });
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ message: "No orders found for this user", status: false });
+    }
+
+    // Organize order details
+    const response = orders.map((order) => {
+      const supplierDetails = {};
+      order.items.forEach((item) => {
+        const supplierId = item.supplier_id.toString();
+        if (!supplierDetails[supplierId]) {
+          supplierDetails[supplierId] = {
+            total_amount: 0,
+            full_name: item.product_id.supplier_id.full_name,
+            verification_code: item.verification_code,
+            products: [],
+          };
+        }
+
+        supplierDetails[supplierId].total_amount += item.product_id.price * item.quantity;
+        supplierDetails[supplierId].products.push({
+          status: item.status,
+          product_id: item.product_id._id,
+          quantity: item.quantity,
+          price: item.product_id.price,
+          product_images: item.product_id.product_images,
+          product_name: item.product_id.english_name,
+        });
+      });
+
+      return {
+        _id: order._id,
+        order_id: order.order_id,
+        order_status: order.status,
+        payment_method: order.payment_method,
+        created_at: order.createdAt,
+        updated_at: order.updatedAt,
+        details: Object.keys(supplierDetails).map((supplierId) => ({
+          supplier_id: supplierId,
+          full_name: supplierDetails[supplierId].full_name,
+          verification_code: supplierDetails[supplierId].verification_code,
+          total_amount: supplierDetails[supplierId].total_amount,
+          products: supplierDetails[supplierId].products,
+        })),
+      };
+    });
+
+    res.status(200).json({
+      status: true,
+      message: "User order details fetched successfully",
+      orders: response,
+    });
+  } catch (error) {
+    console.error("Error fetching user order details:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 const getUserOrderDetails = asyncHandler(async (req, res) => {
   const userID = req.headers.userID;
 
@@ -2246,4 +2374,6 @@ module.exports = {
   decreaseCartQuantity,
   checkout,
   getUserOrderDetails,
+  getAllOrders,
+  getUserOrderInAdmin,
 };
