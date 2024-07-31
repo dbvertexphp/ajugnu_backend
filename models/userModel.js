@@ -1,11 +1,6 @@
 const mongoose = require("mongoose");
-
-const Schema = mongoose.Schema;
 const bcrypt = require("bcryptjs");
-const format = require("date-fns");
 const moment = require("moment-timezone");
-const moments = require("moment");
-const { getSignedUrlS3 } = require("../config/aws-s3.js");
 
 const userSchema = mongoose.Schema({
   full_name: { type: String },

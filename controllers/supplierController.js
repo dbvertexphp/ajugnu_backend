@@ -5,10 +5,12 @@ const dotenv = require("dotenv");
 const ErrorHandler = require("../utils/errorHandler.js");
 const Product = require("../models/productModel.js");
 const upload = require("../middleware/uploadMiddleware.js");
-const fs = require("fs");
 const { addDays, isWeekend } = require("date-fns");
 const moment = require("moment-business-days");
 const TeacherPayment = require("../models/TeacherPaymentModel.js");
+const fs = require("fs");
+const path = require("path");
+const Order = require("../models/orderModel.js");
 
 dotenv.config();
 
@@ -147,7 +149,7 @@ const addProduct = asyncHandler(async (req, res, next) => {
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
-    console.log(req.body);
+
     const { english_name, local_name, other_name, category_id, price, quantity, product_type, product_size, description, pin_code } = req.body;
     const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
@@ -155,13 +157,13 @@ const addProduct = asyncHandler(async (req, res, next) => {
       // Validate required fields
       if (!english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !supplier_id || !pin_code) {
         return res.status(400).json({
-          message: "All fields (english_name, price, quantity, product_type, product_size, description) are required.",
+          message: "All fields (english_name, price, quantity, product_type, product_size, description, category_id, supplier_id, pin_code) are required.",
           status: false,
         });
       }
 
       // Handle pin_code as an array
-      const pinCodesArray = pin_code ? (Array.isArray(pin_code) ? pin_code : [pin_code]) : [];
+      const pinCodesArray = Array.isArray(pin_code) ? pin_code : [pin_code];
 
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
@@ -177,12 +179,12 @@ const addProduct = asyncHandler(async (req, res, next) => {
         return res.status(400).json({ message: `Invalid pin codes: ${invalidPinCodes.join(", ")}`, status: false });
       }
 
-      // Get the profile picture path if uploaded
-      const product_images = req.files && req.files.length > 0 ? req.files[0].filename : null;
+      // Get the profile picture paths if uploaded
+      const product_images = req.files ? req.files.map((file) => `${req.uploadPath}/${file.filename}`) : [];
 
       // Create new Product with parsed dates
       const newProduct = new Product({
-        product_images: product_images ? `${req.uploadPath}/${product_images}` : null,
+        product_images,
         english_name,
         local_name,
         other_name,
@@ -200,7 +202,7 @@ const addProduct = asyncHandler(async (req, res, next) => {
 
       res.status(201).json({
         _id: savedProduct._id,
-        product_image: savedProduct.product_image,
+        product_images: savedProduct.product_images,
         english_name: savedProduct.english_name,
         local_name: savedProduct.local_name,
         other_name: savedProduct.other_name,
@@ -223,7 +225,7 @@ const addProduct = asyncHandler(async (req, res, next) => {
 
 const editProduct = asyncHandler(async (req, res, next) => {
   req.uploadPath = "uploads/product";
-  upload.single("product_image")(req, res, async (err) => {
+  upload.array("product_images")(req, res, async (err) => {
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
@@ -235,7 +237,7 @@ const editProduct = asyncHandler(async (req, res, next) => {
       // Validate required fields
       if (!product_id || !english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !supplier_id || !pin_code) {
         return res.status(400).json({
-          message: "All fields (product_id, english_name, price, quantity, product_type, product_size, description, category_id) are required.",
+          message: "All fields (product_id, english_name, price, quantity, product_type, product_size, description, category_id, supplier_id, pin_code) are required.",
           status: false,
         });
       }
@@ -252,7 +254,7 @@ const editProduct = asyncHandler(async (req, res, next) => {
       }
 
       // Handle pin_code as an array
-      const pinCodesArray = pin_code ? (Array.isArray(pin_code) ? pin_code : [pin_code]) : [];
+      const pinCodesArray = Array.isArray(pin_code) ? pin_code : [pin_code];
 
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
@@ -280,16 +282,28 @@ const editProduct = asyncHandler(async (req, res, next) => {
       product.description = description;
       product.pin_code = pinCodesArray;
 
-      // Update the product image if a new file is uploaded
-      if (req.file) {
-        product.product_image = `${req.uploadPath}/${req.file.filename}`;
+      // Remove old product images from the server
+      if (req.files && req.files.length > 0) {
+        const oldImages = product.product_images;
+        oldImages.forEach((image) => {
+          const imagePath = path.join(__dirname, "..", image);
+          fs.unlink(imagePath, (err) => {
+            if (err) {
+              console.error(`Failed to delete old image: ${image}`, err);
+            }
+          });
+        });
+
+        // Add new product images
+        const newImages = req.files.map((file) => `${req.uploadPath}/${file.filename}`);
+        product.product_images = newImages;
       }
 
       const updatedProduct = await product.save();
 
       res.status(200).json({
         _id: updatedProduct._id,
-        product_image: updatedProduct.product_image,
+        product_images: updatedProduct.product_images,
         english_name: updatedProduct.english_name,
         local_name: updatedProduct.local_name,
         other_name: updatedProduct.other_name,
@@ -377,6 +391,28 @@ const getProducts = asyncHandler(async (req, res) => {
   }
 });
 
+const getProductById = asyncHandler(async (req, res) => {
+  const { product_id } = req.body; // Assuming user authentication middleware sets this header
+
+  try {
+    if (!product_id) {
+      return res.status(400).json({
+        message: "PRoduct ID is required.",
+        status: false,
+      });
+    }
+    const product = await Product.findById(product_id);
+
+    res.status(200).json({
+      product,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching product:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 const getPincode = asyncHandler(async (req, res) => {
   const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
   try {
@@ -398,4 +434,137 @@ const getPincode = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct };
+const getOrdersBySupplierId = asyncHandler(async (req, res) => {
+  const supplier_id = req.headers.userID;
+
+  try {
+    // Validate supplier_id
+    if (!supplier_id) {
+      return res.status(400).json({ message: "supplier_id is required", status: false });
+    }
+
+    // Find all orders for the supplier
+    const orders = await Order.find({ "items.supplier_id": supplier_id }).populate({
+      path: "items.product_id",
+      populate: {
+        path: "supplier_id",
+        select: "full_name", // Assuming supplier schema has a field 'full_name'
+      },
+    });
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ message: "No orders found for this supplier", status: false });
+    }
+
+    // Organize order details
+    const response = orders
+      .map((order) => {
+        const supplierDetails = {};
+        order.items.forEach((item) => {
+          if (item.supplier_id.toString() === supplier_id) {
+            if (!supplierDetails[supplier_id]) {
+              supplierDetails[supplier_id] = {
+                total_amount: 0,
+                full_name: item.product_id.supplier_id.full_name,
+                verification_code: item.verification_code,
+                products: [],
+              };
+            }
+
+            supplierDetails[supplier_id].total_amount += item.product_id.price * item.quantity;
+            supplierDetails[supplier_id].products.push({
+              status: item.status,
+              product_id: item.product_id._id,
+              quantity: item.quantity,
+              price: item.product_id.price,
+              product_images: item.product_id.product_images,
+              product_name: item.product_id.english_name,
+            });
+          }
+        });
+
+        return {
+          _id: order._id,
+          order_id: order.order_id,
+          order_status: order.status,
+          payment_method: order.payment_method,
+          created_at: order.createdAt,
+          updated_at: order.updatedAt,
+          details: supplierDetails[supplier_id]
+            ? [
+                {
+                  supplier_id: supplier_id,
+                  full_name: supplierDetails[supplier_id].full_name,
+                  verification_code: supplierDetails[supplier_id].verification_code,
+                  total_amount: supplierDetails[supplier_id].total_amount,
+                  products: supplierDetails[supplier_id].products,
+                },
+              ]
+            : [],
+        };
+      })
+      .filter((order) => order.details.length > 0); // Filter out orders with no matching details
+
+    res.status(200).json({
+      status: true,
+      message: "Supplier order details fetched successfully",
+      orders: response,
+    });
+  } catch (error) {
+    console.error("Error fetching supplier order details:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const updateOrderItemStatus = asyncHandler(async (req, res) => {
+  const { order_id, product_id, new_status } = req.body;
+
+  try {
+    // Validate input
+    if (!order_id || !product_id || !new_status) {
+      return res.status(400).json({ message: "order_id, product_id, and new_status are required", status: false });
+    }
+
+    // Validate new_status
+    const validStatuses = ["pending", "confirmed", "shipped", "ontheway", "delivered", "cancelled"];
+    if (!validStatuses.includes(new_status)) {
+      return res.status(400).json({ message: "Invalid status", status: false });
+    }
+
+    // Find and update the order item
+    const order = await Order.findOneAndUpdate(
+      { _id: order_id, "items.product_id": product_id },
+      {
+        $set: {
+          "items.$.status": new_status,
+          updated_at: Date.now(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ message: "Order or item not found", status: false });
+    }
+
+    // Filter items to include only those with the same supplier_id as the updated item
+    const updatedItem = order.items.find((item) => item.product_id.toString() === product_id);
+    const supplierId = updatedItem ? updatedItem.supplier_id : null;
+
+    const filteredItems = order.items.filter((item) => item.supplier_id.toString() === supplierId.toString());
+
+    res.status(200).json({
+      status: true,
+      message: "Order item status updated successfully",
+      order: {
+        ...order.toObject(),
+        items: filteredItems, // Include only the filtered items in the response
+      },
+    });
+  } catch (error) {
+    console.error("Error updating order item status:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus };

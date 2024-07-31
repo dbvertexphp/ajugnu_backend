@@ -1188,10 +1188,11 @@ const getUserOrderDetails = asyncHandler(async (req, res) => {
 
         supplierDetails[supplierId].total_amount += item.product_id.price * item.quantity;
         supplierDetails[supplierId].products.push({
+          status: item.status,
           product_id: item.product_id._id,
           quantity: item.quantity,
           price: item.product_id.price,
-          product_image: item.product_id.product_image,
+          product_images: item.product_id.product_images,
           product_name: item.product_id.english_name,
         });
       });
@@ -1445,9 +1446,9 @@ const updateProfileDataByAdmin = asyncHandler(async (req, res) => {
 
 const getAllDashboardCount = asyncHandler(async (req, res) => {
   try {
-    const teacherCount = await User.countDocuments({ role: "teacher" });
-    const studentCount = await User.countDocuments({ role: "student" });
-    const courseCount = await Course.countDocuments();
+    const teacherCount = await User.countDocuments({ role: "supplier" });
+    const studentCount = await User.countDocuments({ role: "user" });
+    const courseCount = await Product.countDocuments();
     const adminnotifications = await AdminNotificationMessages.countDocuments({
       readstatus: false,
     }); // Counting only documents with readstatus false
