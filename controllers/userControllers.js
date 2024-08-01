@@ -646,6 +646,30 @@ const ChangePassword = asyncHandler(async (req, res, next) => {
   }
 });
 
+const getAllSupplier = asyncHandler(async (req, res) => {
+  try {
+    const supplier = await User.find({ role: "supplier" }).select("full_name _id");
+
+    if (!supplier) {
+      return res.status(200).json({
+        message: "Supplier Not Found",
+        status: false,
+      });
+    }
+
+    res.json({
+      Supplier: supplier,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Get Supplier API error:", error.message);
+    res.status(500).json({
+      message: "Internal Server Error",
+      status: false,
+    });
+  }
+});
+
 // Controller function to get products by category_id
 const getProductByCategory_id = asyncHandler(async (req, res) => {
   const { category_id } = req.body;
@@ -1175,9 +1199,9 @@ const getAllOrders = asyncHandler(async (req, res) => {
       .sort({ [sortBy]: order })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("user_id", "name email") // Populate user details
-      .populate("items.product_id", "name price") // Populate product details
-      .populate("items.supplier_id", "name"); // Populate supplier details
+      .populate("user_id", "full_name email") // Populate user details
+      .populate("items.product_id", "english_name price") // Populate product details
+      .populate("items.supplier_id", "full_name"); // Populate supplier details
 
     // Fetch payment status from the Transaction collection
     const ordersWithPaymentStatus = await Promise.all(
@@ -2376,4 +2400,5 @@ module.exports = {
   getUserOrderDetails,
   getAllOrders,
   getUserOrderInAdmin,
+  getAllSupplier,
 };
