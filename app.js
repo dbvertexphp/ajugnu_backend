@@ -27,7 +27,9 @@ const cors = require("cors");
 const path = require("path");
 const { subCategoryRoutes } = require("./routes/subCategoryRoutes.js");
 const { supplierRoutes } = require("./routes/supplierRoutes.js");
-const { teacherNotificationsRoutes } = require("./routes/teacherNotificationRoutes.js");
+const { fertilizerRoutes } = require("./routes/fertilizerRoutes.js");
+const { toolsRoutes } = require("./routes/toolsRoutes.js");
+const { orderNotificationsRoutes } = require("./routes/orderNotificationRoutes.js");
 require("dotenv").config();
 
 // --------------------------Firebase Admin SDK------------------------------
@@ -51,7 +53,9 @@ app.use(
 
 app.use("/api/user", userRoutes);
 app.use("/api/supplier", supplierRoutes);
-app.use("/api/teacherNotification", teacherNotificationsRoutes);
+app.use("/api/fertilizer", fertilizerRoutes);
+app.use("/api/tools", toolsRoutes);
+app.use("/api/orderNotification", orderNotificationsRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/message", messageRoutes);
 app.use("/api/category", categoryRoutes);

@@ -28,6 +28,9 @@ const TeacherPayment = require("../models/TeacherPaymentModel.js");
 const Favorite = require("../models/favorite.js");
 const Rating = require("../models/ratingModel.js");
 const fs = require("fs");
+const { addNotification } = require("./orderNotificationController");
+const { sendFCMNotification } = require("./notificationControllers");
+
 const getUsers = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   try {
@@ -1124,7 +1127,7 @@ const checkout = asyncHandler(async (req, res) => {
         quantity: item.quantity,
         supplier_id: supplierId,
         verification_code: verificationCodes[supplierId], // Add verification code to each item
-        status: "pending", // Default status for each item
+        status: "order", // Default status for each item
       };
     });
 
@@ -1142,6 +1145,22 @@ const checkout = asyncHandler(async (req, res) => {
     });
 
     const savedOrder = await order.save();
+
+    const user = User.findById(userID);
+    console.log(user.firebase_token);
+    if (user.firebase_token) {
+      const registrationToken = user.firebase_token;
+      const title = "Order Placed";
+      const body = `Your order has been successfully placed!`;
+      console.log(registrationToken);
+      const notificationResult = await sendFCMNotification(registrationToken, title, body);
+      if (notificationResult.success) {
+        console.log("Notification sent successfully:", notificationResult.response);
+      } else {
+        console.error("Failed to send notification:", notificationResult.error);
+      }
+      await addNotification(savedOrder.user_id, savedOrder._id, savedOrder.total_amount, title, "order");
+    }
 
     // Update product stock and clear user's cart
     for (const item of cartItems) {

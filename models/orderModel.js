@@ -9,7 +9,7 @@ const orderSchema = new mongoose.Schema({
       quantity: { type: Number, required: true },
       supplier_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
       verification_code: { type: String, required: true },
-      status: { type: String, enum: ["pending", "confirmed", "shipped", "ontheway", "delivered", "cancelled"], default: "pending" }, // Status for each item
+      status: { type: String, enum: ["order", "confirmed", "shipped", "ontheway", "delivered", "cancelled"], default: "order" }, // Status for each item
     },
   ],
   shipping_address: {

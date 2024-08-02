@@ -3,7 +3,7 @@ const Transaction = require("../models/transactionModel");
 const Order = require("../models/orderModel"); // Ensure correct import path
 const Product = require("../models/productModel");
 const { User } = require("../models/userModel");
-const { addNotification } = require("./teacherNotificationController");
+const { addNotification } = require("./orderNotificationController");
 const { sendFCMNotification } = require("./notificationControllers");
 
 const addTransaction = asyncHandler(async (req, res) => {

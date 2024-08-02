@@ -3,7 +3,8 @@ const asyncHandler = require("express-async-handler");
 const { User } = require("../models/userModel.js");
 const dotenv = require("dotenv");
 const ErrorHandler = require("../utils/errorHandler.js");
-const Product = require("../models/productModel.js");
+const Fertilizer = require("../models/fertilizerModel.js");
+const Tools = require("../models/toolsModel.js");
 const upload = require("../middleware/uploadMiddleware.js");
 const { addDays, isWeekend } = require("date-fns");
 const moment = require("moment-business-days");
@@ -11,161 +12,27 @@ const TeacherPayment = require("../models/TeacherPaymentModel.js");
 const fs = require("fs");
 const path = require("path");
 const Order = require("../models/orderModel.js");
-const { addNotification } = require("./orderNotificationController");
-const { sendFCMNotification } = require("./notificationControllers");
 
 dotenv.config();
 
-const updateSupplierProfileData = asyncHandler(async (req, res) => {
-  req.uploadPath = "uploads/profiles";
-  upload.fields([{ name: "profile_pic", maxCount: 1 }])(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({ error: err.message });
-    }
-
-    const { full_name, mobile, email, address, pin_code } = req.body;
-    const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
-
-    // Get the profile picture path if uploaded
-    const profile_pic = req.files.profile_pic ? `${req.uploadPath}/${req.files.profile_pic[0].filename}` : null;
-
-    try {
-      // Find the current user to get the old image paths
-      const currentUser = await User.findById(supplier_id);
-      if (!currentUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Build the update object with optional fields
-      let updateFields = {
-        datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
-      };
-
-      // Update optional fields if provided
-      if (full_name) {
-        updateFields.full_name = full_name;
-      }
-      if (mobile) {
-        updateFields.mobile = mobile;
-      }
-      if (email) {
-        updateFields.email = email;
-      }
-      if (address) {
-        updateFields.address = address;
-      }
-
-      // Check if there is a new profile pic uploaded and delete the old one
-      if (profile_pic && currentUser.profile_pic) {
-        const oldProfilePicPath = currentUser.profile_pic;
-        updateFields.profile_pic = profile_pic;
-
-        // Delete the old profile picture
-        deleteFile(oldProfilePicPath);
-      } else if (profile_pic) {
-        updateFields.profile_pic = profile_pic;
-      }
-
-      // Handle pin_code as an array using $addToSet to avoid duplicates
-      let pinCodesArray = [];
-      if (pin_code) {
-        pinCodesArray = Array.isArray(pin_code) ? pin_code : [parseInt(pin_code, 10)];
-        pinCodesArray = [...new Set(pinCodesArray)]; // Remove duplicates
-      }
-
-      // Update the user's profile fields
-      const updatedUser = await User.findByIdAndUpdate(
-        supplier_id,
-        {
-          $set: {
-            full_name: updateFields.full_name,
-            mobile: updateFields.mobile,
-            email: updateFields.email,
-            address: updateFields.address,
-            profile_pic: updateFields.profile_pic,
-            datetime: updateFields.datetime,
-          },
-          $addToSet: { pin_code: { $each: pinCodesArray } },
-        },
-        { new: true }
-      );
-
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Return the updated user data
-      return res.status(200).json({
-        _id: updatedUser._id,
-        full_name: updatedUser.full_name,
-        mobile: updatedUser.mobile,
-        email: updatedUser.email,
-        address: updatedUser.address,
-        pin_code: updatedUser.pin_code,
-        profile_pic: updatedUser.profile_pic,
-        status: true,
-      });
-    } catch (error) {
-      console.error("Error updating user profile:", error.message);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-  });
-});
-
-const getSupplierProfileData = asyncHandler(async (req, res) => {
-  const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
-
-  try {
-    // Find the user by ID
-    const user = await User.findById(supplier_id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Return the user's profile information
-    return res.status(200).json({
-      user: user,
-
-      status: true,
-    });
-  } catch (error) {
-    console.error("Error fetching user profile:", error.message);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// Function to delete a file from the filesystem
-function deleteFile(filePath) {
-  fs.unlink(filePath, (err) => {
-    if (err) {
-      console.error("Error deleting file:", err);
-    } else {
-      console.log(`Deleted file: ${filePath}`);
-    }
-  });
-}
-
-const addProduct = asyncHandler(async (req, res, next) => {
-  req.uploadPath = "uploads/product";
-  upload.array("product_images")(req, res, async (err) => {
+const addTools = asyncHandler(async (req, res, next) => {
+  req.uploadPath = "uploads/tools";
+  upload.single("product_image")(req, res, async (err) => {
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
 
-    const { english_name, local_name, other_name, category_id, price, quantity, product_type, product_size, description, pin_code } = req.body;
-    const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
+    const { product_name, product_price, supplier_id, product_quantity } = req.body;
+    let quantity = Number(product_quantity);
 
     try {
       // Validate required fields
-      if (!english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !pin_code) {
+      if (!product_name || !product_price || !supplier_id || !product_quantity) {
         return res.status(400).json({
-          message: "All fields (english_name, price, quantity, product_type, product_size, description, category_id, pin_code) are required.",
+          message: "All fields (product_name, product_price, supplier_id, product_quantity) are required.",
           status: false,
         });
       }
-
-      // Handle pin_code as an array
-      const pinCodesArray = Array.isArray(pin_code) ? pin_code : [pin_code];
 
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
@@ -175,51 +42,33 @@ const addProduct = asyncHandler(async (req, res, next) => {
 
       const userPinCodes = user.pin_code || [];
 
-      // Check if provided pin codes exist in the user's pin_code array
-      const invalidPinCodes = pinCodesArray.filter((pin) => !userPinCodes.includes(pin));
-      if (invalidPinCodes.length > 0) {
-        return res.status(400).json({ message: `Invalid pin codes: ${invalidPinCodes.join(", ")}`, status: false });
-      }
+      // Get the profile picture path if uploaded
+      const product_image = req.file ? `${req.uploadPath}/${req.file.filename}` : "";
 
-      // Get the profile picture paths if uploaded
-      const product_images = req.files ? req.files.map((file) => `${req.uploadPath}/${file.filename}`) : [];
-
-      // Create new Product with parsed dates
-      const newProduct = new Product({
-        product_images,
-        english_name,
-        local_name,
-        other_name,
-        category_id,
-        price,
-        quantity,
-        product_type,
-        product_size,
-        description,
+      // Create new Fertilizer with parsed dates
+      const newTools = new Tools({
+        product_image,
+        product_name,
+        product_price,
         supplier_id,
-        pin_code: pinCodesArray,
+        product_quantity: quantity,
+        pin_code: userPinCodes,
       });
 
-      const savedProduct = await newProduct.save();
+      const savedTools = await newTools.save();
 
       res.status(201).json({
-        _id: savedProduct._id,
-        product_images: savedProduct.product_images,
-        english_name: savedProduct.english_name,
-        local_name: savedProduct.local_name,
-        other_name: savedProduct.other_name,
-        category_id: savedProduct.category_id,
-        price: savedProduct.price,
-        quantity: savedProduct.quantity,
-        product_type: savedProduct.product_type,
-        product_size: savedProduct.product_size,
-        description: savedProduct.description,
-        supplier_id: savedProduct.supplier_id,
-        pin_code: savedProduct.pin_code,
+        _id: savedTools._id,
+        product_image: savedTools.product_image,
+        product_name: savedTools.product_name,
+        product_price: savedTools.product_price,
+        supplier_id: savedTools.supplier_id,
+        product_quantity: savedTools.product_quantity,
+        pin_code: savedTools.pin_code,
         status: true,
       });
     } catch (error) {
-      console.error("Error adding product:", error.message);
+      console.error("Error adding Tools:", error.message);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
@@ -245,7 +94,7 @@ const editProduct = asyncHandler(async (req, res, next) => {
       }
 
       // Fetch the product to be updated
-      const product = await Product.findById(product_id);
+      const product = await Fertilizer.findById(product_id);
       if (!product) {
         return res.status(404).json({ message: "Product not found", status: false });
       }
@@ -326,13 +175,12 @@ const editProduct = asyncHandler(async (req, res, next) => {
   });
 });
 
-const deleteProduct = asyncHandler(async (req, res) => {
+const deleteTools = asyncHandler(async (req, res) => {
   const { product_id } = req.body; // Product ID is provided in the URL
-  const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
   try {
     // Validate the product_id and supplier_id
-    if (!product_id || !supplier_id) {
+    if (!product_id) {
       return res.status(400).json({
         message: "Product ID and Supplier ID are required.",
         status: false,
@@ -340,25 +188,20 @@ const deleteProduct = asyncHandler(async (req, res) => {
     }
 
     // Find the product to be deleted
-    const product = await Product.findById(product_id);
+    const product = await Tools.findById(product_id);
     if (!product) {
-      return res.status(404).json({ message: "Product not found", status: false });
-    }
-
-    // Check if the supplier_id matches
-    if (product.supplier_id.toString() !== supplier_id) {
-      return res.status(403).json({ message: "You do not have permission to delete this product", status: false });
+      return res.status(404).json({ message: "Tools not found", status: false });
     }
 
     // Delete the product
-    await Product.findByIdAndDelete(product_id);
+    await Tools.findByIdAndDelete(product_id);
 
     res.status(200).json({
-      message: "Product deleted successfully.",
+      message: "Tools deleted successfully.",
       status: true,
     });
   } catch (error) {
-    console.error("Error deleting product:", error.message);
+    console.error("Error deleting Tools:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -378,7 +221,7 @@ const getProducts = asyncHandler(async (req, res) => {
 
     const skip = (page - 1) * limit;
     const totalProducts = await Product.countDocuments({ supplier_id });
-    const products = await Product.find({ supplier_id }).skip(skip).limit(limit);
+    const products = await Fertilizer.find({ supplier_id }).skip(skip).limit(limit);
 
     res.status(200).json({
       products,
@@ -394,7 +237,7 @@ const getProducts = asyncHandler(async (req, res) => {
 });
 
 // Get all products with pagination, search, and sorting
-const getAllProducts = asyncHandler(async (req, res) => {
+const getAllTools = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
   const limit = parseInt(req.query.limit) || 10; // Number of products per page, default to 10
   const search = req.query.search || ""; // Search term
@@ -403,20 +246,20 @@ const getAllProducts = asyncHandler(async (req, res) => {
 
   try {
     const query = {
-      $or: [{ english_name: { $regex: search, $options: "i" } }, { description: { $regex: search, $options: "i" } }],
+      $or: [{ product_name: { $regex: search, $options: "i" } }],
     };
 
-    const totalProducts = await Product.countDocuments(query);
-    const products = await Product.find(query)
+    const totaltools = await Tools.countDocuments(query);
+    const tools = await Tools.find(query)
       .sort({ [sortBy]: order })
       .skip((page - 1) * limit)
       .limit(limit);
 
     res.status(200).json({
-      products,
+      tools,
       page,
-      totalPages: Math.ceil(totalProducts / limit),
-      totalProducts,
+      totalPages: Math.ceil(totaltools / limit),
+      totaltools,
       status: true,
     });
   } catch (error) {
@@ -439,8 +282,8 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
-    const totalProducts = await Product.countDocuments({ supplier_id });
-    const products = await Product.find({ supplier_id }).skip(skip).limit(limit);
+    const totalProducts = await Fertilizer.countDocuments({ supplier_id });
+    const products = await Fertilizer.find({ supplier_id }).skip(skip).limit(limit);
 
     res.status(200).json({
       products,
@@ -465,7 +308,7 @@ const getProductById = asyncHandler(async (req, res) => {
         status: false,
       });
     }
-    const product = await Product.findById(product_id);
+    const product = await Fertilizer.findById(product_id);
 
     res.status(200).json({
       product,
@@ -473,27 +316,6 @@ const getProductById = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching product:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-const getPincode = asyncHandler(async (req, res) => {
-  const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
-  try {
-    if (!supplier_id) {
-      return res.status(400).json({
-        message: "Supplier ID is required.",
-        status: false,
-      });
-    }
-    const Pincodes = await User.findById({ _id: supplier_id });
-
-    res.status(200).json({
-      Pincodes: Pincodes.pin_code,
-      status: true,
-    });
-  } catch (error) {
-    console.error("Error fetching pincode:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -590,7 +412,7 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
     }
 
     // Validate new_status
-    const validStatuses = ["order", "shipped", "ontheway", "delivered", "cancelled"];
+    const validStatuses = ["pending", "confirmed", "shipped", "ontheway", "delivered", "cancelled"];
     if (!validStatuses.includes(new_status)) {
       return res.status(400).json({ message: "Invalid status", status: false });
     }
@@ -609,40 +431,6 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
 
     if (!order) {
       return res.status(404).json({ message: "Order or item not found", status: false });
-    } else {
-      const order = Order.findById(order_id);
-      const user = await User.findById(order.user_id);
-      if (user.firebase_token) {
-        const registrationToken = user.firebase_token;
-
-        let title;
-        let body;
-        if (new_status == "Order") {
-          title = "Order Placed";
-          body = `Your order has been successfully placed!`;
-        } else if (new_status == "shipped") {
-          title = "Order Shipped";
-          body = `Your order has been shipped.`;
-        } else if (new_status == "ontheway") {
-          title = "Order on the Way";
-          body = `Your order is on the way and will reach you soon.`;
-        } else if (new_status == "delivered") {
-          title = "Order Delivered";
-          body = `Your order has been delivered. Enjoy your purchase!`;
-        } else if (new_status == "cancelled") {
-          title = "Order Cancelled";
-          body = `Your order has been cancelled. If you have any questions, please contact us.`;
-        }
-        console.log(registrationToken);
-        const notificationResult = await sendFCMNotification(registrationToken, title, body);
-        if (notificationResult.success) {
-          console.log("Notification sent successfully:", notificationResult.response);
-        } else {
-          console.error("Failed to send notification:", notificationResult.error);
-        }
-      }
-
-      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, title, new_status);
     }
 
     // Filter items to include only those with the same supplier_id as the updated item
@@ -665,4 +453,4 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId };
+module.exports = { getProducts, editProduct, deleteTools, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllTools, getProductsBySupplierId, addTools };

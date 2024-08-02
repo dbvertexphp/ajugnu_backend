@@ -1,6 +1,6 @@
-const TeacherNotification = require("../models/teacherNotificationModel");
+const OrderNotification = require("../models/orderNotificationModel.js");
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/productModel");
+const Course = require("../models/productModel.js");
 const { User } = require("../models/userModel.js");
 const admin = require("firebase-admin"); // Import firebase-admin
 const TeacherAttendance = require("../models/teacherAttendanceModel.js");
@@ -22,14 +22,21 @@ const sendFCMNotification = async (registrationToken, title, body) => {
 };
 
 // Function to add a new notification
-const addNotification = async (userId, teacher_Id, title, course_title, amount) => {
+const addNotification = async (userId, order_id, message, totalamount, title, type) => {
+  console.log(userId);
+  console.log(order_id);
+  console.log(message);
+  console.log(totalamount);
+  console.log(title);
+  console.log(type);
   try {
-    const newNotification = new TeacherNotification({
+    const newNotification = new OrderNotification({
       user_id: userId,
-      teacher_id: teacher_Id,
-      title,
-      body: course_title,
-      amount: amount,
+      order_id: order_id,
+      title: title,
+      type: type,
+      message: message,
+      totalamount: totalamount,
     });
 
     await newNotification.save();
