@@ -1,7 +1,7 @@
 const express = require("express");
 const protect = require("../middleware/authMiddleware.js");
 const Authorization = require("../middleware/Authorization.middleware.js");
-const { addFertilizer, getProducts, editProduct, deleteFertilizer, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllFertilizer, getProductsBySupplierId } = require("../controllers/fertilizerController.js");
+const { addFertilizer, getProducts, editProduct, deleteFertilizer, getFertilizerById, getOrdersBySupplierId, updateOrderItemStatus, getAllFertilizer, getProductsBySupplierId } = require("../controllers/fertilizerController.js");
 
 const fertilizerRoutes = express.Router();
 
@@ -18,7 +18,7 @@ fertilizerRoutes.get("/getAllFertilizer", protect, getAllFertilizer);
 
 fertilizerRoutes.post("/getProductsBySupplierId", protect, getProductsBySupplierId);
 
-fertilizerRoutes.get("/getProductById", protect, Authorization(["supplier", "admin"]), getProductById);
+fertilizerRoutes.get("/getFertilizerById", protect, Authorization(["supplier", "admin"]), getFertilizerById);
 
 fertilizerRoutes.get("/getOrdersBySupplierId", protect, Authorization(["supplier", "admin"]), getOrdersBySupplierId);
 

@@ -4,35 +4,46 @@ const { User } = require("../models/userModel.js");
 const dotenv = require("dotenv");
 const ErrorHandler = require("../utils/errorHandler.js");
 const Fertilizer = require("../models/fertilizerModel.js");
-const upload = require("../middleware/uploadMiddleware.js");
+// const upload = require("../middleware/uploadMiddleware.js");
 const { addDays, isWeekend } = require("date-fns");
 const moment = require("moment-business-days");
 const TeacherPayment = require("../models/TeacherPaymentModel.js");
 const fs = require("fs");
 const path = require("path");
 const Order = require("../models/orderModel.js");
+const Product = require("../models/productModel.js");
+const multer = require("multer");
 
 dotenv.config();
 
+// Configure multer storage
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = req.uploadPath || "uploads/";
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 1024 * 1024 * 5 },
+});
+
 const addFertilizer = asyncHandler(async (req, res, next) => {
   req.uploadPath = "uploads/fertilizer";
-  upload.single("product_image")(req, res, async (err) => {
+  upload.array("product_images")(req, res, async (err) => {
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
+    console.log(req.files);
 
-    const { product_name, product_weight, product_price, supplier_id, product_quantity } = req.body;
-    let quantity = Number(product_quantity);
+    const { english_name, product_weight, price, quantity, product_role, supplier_id } = req.body;
 
     try {
-      // Validate required fields
-      if (!product_name || !product_weight || !product_price || !supplier_id || !product_quantity) {
-        return res.status(400).json({
-          message: "All fields (product_name, product_weight, product_price, supplier_id, product_quantity) are required.",
-          status: false,
-        });
-      }
-
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
       if (!user) {
@@ -41,35 +52,37 @@ const addFertilizer = asyncHandler(async (req, res, next) => {
 
       const userPinCodes = user.pin_code || [];
 
-      // Get the profile picture path if uploaded
-      const product_image = req.file ? `${req.uploadPath}/${req.file.filename}` : "";
+      // Get the profile picture paths if uploaded
+      const product_images = req.files ? req.files.map((file) => `${req.uploadPath}/${file.filename}`) : [];
 
-      // Create new Fertilizer with parsed dates
-      const newFertilizer = new Fertilizer({
-        product_image,
-        product_name,
+      // Create new Product with parsed dates
+      const newProduct = new Product({
+        product_images,
+        english_name,
         product_weight,
-        product_price,
+        price,
+        quantity,
+        product_role,
         supplier_id,
-        product_quantity: quantity,
         pin_code: userPinCodes,
       });
 
-      const savedFertilizer = await newFertilizer.save();
+      const savedProduct = await newProduct.save();
 
       res.status(201).json({
-        _id: savedFertilizer._id,
-        product_image: savedFertilizer.product_image,
-        product_name: savedFertilizer.product_name,
-        product_weight: savedFertilizer.product_weight,
-        product_price: savedFertilizer.product_price,
-        supplier_id: savedFertilizer.supplier_id,
-        product_quantity: savedFertilizer.product_quantity,
-        pin_code: savedFertilizer.pin_code,
+        _id: savedProduct._id,
+        product_images: savedProduct.product_images,
+        english_name: savedProduct.english_name,
+        product_weight: savedProduct.product_weight,
+        price: savedProduct.price,
+        quantity: savedProduct.quantity,
+        product_role: savedProduct.product_role,
+        supplier_id: savedProduct.supplier_id,
+        pin_code: savedProduct.pin_code,
         status: true,
       });
     } catch (error) {
-      console.error("Error adding Fertilizer:", error.message);
+      console.error("Error adding product:", error.message);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
@@ -189,13 +202,13 @@ const deleteFertilizer = asyncHandler(async (req, res) => {
     }
 
     // Find the product to be deleted
-    const product = await Fertilizer.findById(product_id);
+    const product = await Product.findById(product_id);
     if (!product) {
       return res.status(404).json({ message: "Product not found", status: false });
     }
 
     // Delete the product
-    await Fertilizer.findByIdAndDelete(product_id);
+    await Product.findByIdAndDelete(product_id);
 
     res.status(200).json({
       message: "Fertilizer deleted successfully.",
@@ -247,11 +260,16 @@ const getAllFertilizer = asyncHandler(async (req, res) => {
 
   try {
     const query = {
-      $or: [{ product_name: { $regex: search, $options: "i" } }],
+      $and: [
+        { product_role: "fertilizer" }, // Add the condition for product_role
+        {
+          $or: [{ english_name: { $regex: search, $options: "i" } }],
+        },
+      ],
     };
 
-    const totalFertilizer = await Fertilizer.countDocuments(query);
-    const fertilizer = await Fertilizer.find(query)
+    const totalFertilizer = await Product.countDocuments(query);
+    const fertilizer = await Product.find(query)
       .sort({ [sortBy]: order })
       .skip((page - 1) * limit)
       .limit(limit);
@@ -299,24 +317,24 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
   }
 });
 
-const getProductById = asyncHandler(async (req, res) => {
-  const { product_id } = req.body; // Assuming user authentication middleware sets this header
+const getFertilizerById = asyncHandler(async (req, res) => {
+  const { fertilizer_id } = req.body; // Assuming user authentication middleware sets this header
 
   try {
-    if (!product_id) {
+    if (!fertilizer_id) {
       return res.status(400).json({
-        message: "PRoduct ID is required.",
+        message: "Fertilizer ID is required.",
         status: false,
       });
     }
-    const product = await Fertilizer.findById(product_id);
+    const fertilizer = await Fertilizer.findById(fertilizer_id);
 
     res.status(200).json({
-      product,
+      fertilizer,
       status: true,
     });
   } catch (error) {
-    console.error("Error fetching product:", error.message);
+    console.error("Error fetching Fertilizer:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -454,4 +472,4 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { addFertilizer, getProducts, editProduct, deleteFertilizer, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllFertilizer, getProductsBySupplierId };
+module.exports = { addFertilizer, getProducts, editProduct, deleteFertilizer, getFertilizerById, getOrdersBySupplierId, updateOrderItemStatus, getAllFertilizer, getProductsBySupplierId };

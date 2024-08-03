@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
 const http = require("http");
 const ngrok = require("@ngrok/ngrok");
+const bodyParser = require("body-parser");
 
 // --------------------- Routes -------------------------------
 const { userRoutes } = require("./routes/userRoutes.js");
@@ -98,6 +99,8 @@ app.use((err, req, res, next) => {
 // Error Handling middlewares
 app.use(notFound);
 app.use(errorHandler);
+app.use(bodyParser.json({ limit: "100mb" }));
+app.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
 const PORT = process.env.PORT;
 const BASE_URL = process.env.BASE_URL;

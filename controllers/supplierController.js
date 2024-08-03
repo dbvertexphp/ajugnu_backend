@@ -148,22 +148,15 @@ function deleteFile(filePath) {
 const addProduct = asyncHandler(async (req, res, next) => {
   req.uploadPath = "uploads/product";
   upload.array("product_images")(req, res, async (err) => {
+    console.log(req.files);
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
 
-    const { english_name, local_name, other_name, category_id, price, quantity, product_type, product_size, description, pin_code } = req.body;
+    const { english_name, local_name, other_name, category_id, price, quantity, product_type, product_role, product_size, description, pin_code } = req.body;
     const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
     try {
-      // Validate required fields
-      if (!english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !pin_code) {
-        return res.status(400).json({
-          message: "All fields (english_name, price, quantity, product_type, product_size, description, category_id, pin_code) are required.",
-          status: false,
-        });
-      }
-
       // Handle pin_code as an array
       const pinCodesArray = Array.isArray(pin_code) ? pin_code : [pin_code];
 
@@ -194,6 +187,7 @@ const addProduct = asyncHandler(async (req, res, next) => {
         price,
         quantity,
         product_type,
+        product_role,
         product_size,
         description,
         supplier_id,
@@ -212,6 +206,7 @@ const addProduct = asyncHandler(async (req, res, next) => {
         price: savedProduct.price,
         quantity: savedProduct.quantity,
         product_type: savedProduct.product_type,
+        product_role: savedProduct.product_role,
         product_size: savedProduct.product_size,
         description: savedProduct.description,
         supplier_id: savedProduct.supplier_id,
@@ -223,6 +218,34 @@ const addProduct = asyncHandler(async (req, res, next) => {
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
+});
+
+const updateProductStatus = asyncHandler(async (req, res) => {
+  const { productId, active } = req.body; // Get the product ID from the URL parameters
+
+  if (typeof active !== "boolean") {
+    return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
+  }
+
+  try {
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
+
+    product.active = active;
+    const updatedProduct = await product.save();
+
+    res.status(200).json({
+      _id: updatedProduct._id,
+      active: updatedProduct.active,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error updating product status:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const editProduct = asyncHandler(async (req, res, next) => {
@@ -377,8 +400,19 @@ const getProducts = asyncHandler(async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
-    const totalProducts = await Product.countDocuments({ supplier_id });
-    const products = await Product.find({ supplier_id }).skip(skip).limit(limit);
+    const totalProducts = await Product.countDocuments({
+      supplier_id,
+      product_role: "supplier",
+      active: true,
+    });
+
+    const products = await Product.find({
+      supplier_id,
+      product_role: "supplier",
+      active: true,
+    })
+      .skip(skip)
+      .limit(limit);
 
     res.status(200).json({
       products,
@@ -393,7 +427,6 @@ const getProducts = asyncHandler(async (req, res) => {
   }
 });
 
-// Get all products with pagination, search, and sorting
 const getAllProducts = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
   const limit = parseInt(req.query.limit) || 10; // Number of products per page, default to 10
@@ -403,7 +436,49 @@ const getAllProducts = asyncHandler(async (req, res) => {
 
   try {
     const query = {
-      $or: [{ english_name: { $regex: search, $options: "i" } }, { description: { $regex: search, $options: "i" } }],
+      $and: [
+        { product_role: "supplier" },
+        { active: true },
+        {
+          $or: [{ english_name: { $regex: search, $options: "i" } }],
+        },
+      ],
+    };
+
+    const totalProducts = await Product.countDocuments(query);
+    const products = await Product.find(query)
+      .sort({ [sortBy]: order })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.status(200).json({
+      products,
+      page,
+      totalPages: Math.ceil(totalProducts / limit),
+      totalProducts,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
+});
+
+const getAllProductsInAdmin = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const limit = parseInt(req.query.limit) || 10; // Number of products per page, default to 10
+  const search = req.query.search || ""; // Search term
+  const sortBy = req.query.sortBy || "createdAt"; // Field to sort by, default to 'createdAt'
+  const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
+
+  try {
+    const query = {
+      $and: [
+        { product_role: "supplier" },
+        {
+          $or: [{ english_name: { $regex: search, $options: "i" } }],
+        },
+      ],
     };
 
     const totalProducts = await Product.countDocuments(query);
@@ -440,7 +515,7 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
 
     const skip = (page - 1) * limit;
     const totalProducts = await Product.countDocuments({ supplier_id });
-    const products = await Product.find({ supplier_id }).skip(skip).limit(limit);
+    const products = await Product.find({ supplier_id, active: true }).skip(skip).limit(limit);
 
     res.status(200).json({
       products,
@@ -665,4 +740,4 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId };
+module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId, getAllProductsInAdmin, updateProductStatus };

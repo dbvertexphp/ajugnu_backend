@@ -12,28 +12,20 @@ const TeacherPayment = require("../models/TeacherPaymentModel.js");
 const fs = require("fs");
 const path = require("path");
 const Order = require("../models/orderModel.js");
+const Product = require("../models/productModel.js");
 
 dotenv.config();
 
 const addTools = asyncHandler(async (req, res, next) => {
   req.uploadPath = "uploads/tools";
-  upload.single("product_image")(req, res, async (err) => {
+  upload.array("product_images")(req, res, async (err) => {
     if (err) {
       return next(new ErrorHandler(err.message, 400));
     }
 
-    const { product_name, product_price, supplier_id, product_quantity } = req.body;
-    let quantity = Number(product_quantity);
+    const { english_name, price, quantity, product_role, supplier_id } = req.body;
 
     try {
-      // Validate required fields
-      if (!product_name || !product_price || !supplier_id || !product_quantity) {
-        return res.status(400).json({
-          message: "All fields (product_name, product_price, supplier_id, product_quantity) are required.",
-          status: false,
-        });
-      }
-
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
       if (!user) {
@@ -42,33 +34,35 @@ const addTools = asyncHandler(async (req, res, next) => {
 
       const userPinCodes = user.pin_code || [];
 
-      // Get the profile picture path if uploaded
-      const product_image = req.file ? `${req.uploadPath}/${req.file.filename}` : "";
+      // Get the profile picture paths if uploaded
+      const product_images = req.files ? req.files.map((file) => `${req.uploadPath}/${file.filename}`) : [];
 
-      // Create new Fertilizer with parsed dates
-      const newTools = new Tools({
-        product_image,
-        product_name,
-        product_price,
+      // Create new Product with parsed dates
+      const newProduct = new Product({
+        product_images,
+        english_name,
+        price,
+        quantity,
+        product_role,
         supplier_id,
-        product_quantity: quantity,
         pin_code: userPinCodes,
       });
 
-      const savedTools = await newTools.save();
+      const savedProduct = await newProduct.save();
 
       res.status(201).json({
-        _id: savedTools._id,
-        product_image: savedTools.product_image,
-        product_name: savedTools.product_name,
-        product_price: savedTools.product_price,
-        supplier_id: savedTools.supplier_id,
-        product_quantity: savedTools.product_quantity,
-        pin_code: savedTools.pin_code,
+        _id: savedProduct._id,
+        product_images: savedProduct.product_images,
+        english_name: savedProduct.english_name,
+        price: savedProduct.price,
+        quantity: savedProduct.quantity,
+        product_role: savedProduct.product_role,
+        supplier_id: savedProduct.supplier_id,
+        pin_code: savedProduct.pin_code,
         status: true,
       });
     } catch (error) {
-      console.error("Error adding Tools:", error.message);
+      console.error("Error adding product:", error.message);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
@@ -188,13 +182,13 @@ const deleteTools = asyncHandler(async (req, res) => {
     }
 
     // Find the product to be deleted
-    const product = await Tools.findById(product_id);
+    const product = await Product.findById(product_id);
     if (!product) {
       return res.status(404).json({ message: "Tools not found", status: false });
     }
 
     // Delete the product
-    await Tools.findByIdAndDelete(product_id);
+    await Product.findByIdAndDelete(product_id);
 
     res.status(200).json({
       message: "Tools deleted successfully.",
@@ -246,11 +240,16 @@ const getAllTools = asyncHandler(async (req, res) => {
 
   try {
     const query = {
-      $or: [{ product_name: { $regex: search, $options: "i" } }],
+      $and: [
+        { product_role: "tools" }, // Add the condition for product_role
+        {
+          $or: [{ english_name: { $regex: search, $options: "i" } }],
+        },
+      ],
     };
 
-    const totaltools = await Tools.countDocuments(query);
-    const tools = await Tools.find(query)
+    const totaltools = await Product.countDocuments(query);
+    const tools = await Product.find(query)
       .sort({ [sortBy]: order })
       .skip((page - 1) * limit)
       .limit(limit);
