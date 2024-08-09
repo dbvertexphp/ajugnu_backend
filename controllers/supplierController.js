@@ -13,6 +13,8 @@ const path = require("path");
 const Order = require("../models/orderModel.js");
 const { addNotification } = require("./orderNotificationController");
 const { sendFCMNotification } = require("./notificationControllers");
+const OrderNotification = require("../models/orderNotificationModel.js");
+
 
 dotenv.config();
 
@@ -760,6 +762,30 @@ const getPopularProduct = asyncHandler(async (req, res) => {
         console.error("Error fetching popular products:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
       }
+});
+
+const getSupplierOrderNotification = asyncHandler(async (req, res) => {
+      const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
+
+      try {
+        if (!supplierId) {
+          return res.status(400).json({ message: "Supplier ID is required", status: false });
+        }
+
+        const notifications = await OrderNotification.find({ supplier_ids: supplierId });
+
+        if (!notifications || notifications.length === 0) {
+          return res.status(404).json({ message: "No notifications found", status: false });
+        }
+
+        res.status(200).json({
+          status: true,
+          notifications: notifications,
+        });
+      } catch (error) {
+        console.error("Error fetching supplier order notifications:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId, getAllProductsInAdmin, updateProductStatus, getPopularProduct };
+module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId, getAllProductsInAdmin, updateProductStatus, getPopularProduct, getSupplierOrderNotification };

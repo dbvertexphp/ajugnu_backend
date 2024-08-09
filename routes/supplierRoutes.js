@@ -16,6 +16,7 @@ const {
   getProductsBySupplierId,
   getAllProductsInAdmin,
   updateProductStatus,
+  getSupplierOrderNotification,
 
 } = require("../controllers/supplierController.js");
 
@@ -49,5 +50,8 @@ supplierRoutes.put("/updateOrderItemStatus", protect, Authorization(["supplier"]
 supplierRoutes.put("/updateSupplierProfileData", protect, Authorization(["supplier"]), updateSupplierProfileData);
 
 supplierRoutes.get("/getSupplierProfileData", protect, Authorization(["supplier"]), getSupplierProfileData);
+
+supplierRoutes.get("/getSupplierOrderNotification", protect, Authorization(["supplier"]), getSupplierOrderNotification);
+
 
 module.exports = { supplierRoutes };
