@@ -23,12 +23,6 @@ const sendFCMNotification = async (registrationToken, title, body) => {
 
 // Function to add a new notification
 const addNotification = async (userId, order_id, message, totalamount, title, type) => {
-  console.log(userId);
-  console.log(order_id);
-  console.log(message);
-  console.log(totalamount);
-  console.log(title);
-  console.log(type);
   try {
     const newNotification = new OrderNotification({
       user_id: userId,

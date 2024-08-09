@@ -16,6 +16,7 @@ const {
   getProductsBySupplierId,
   getAllProductsInAdmin,
   updateProductStatus,
+
 } = require("../controllers/supplierController.js");
 
 const supplierRoutes = express.Router();

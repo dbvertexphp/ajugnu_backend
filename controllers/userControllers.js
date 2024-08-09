@@ -25,6 +25,7 @@ const Product = require("../models/productModel.js");
 const Cart = require("../models/cartModel.js");
 const Order = require("../models/orderModel.js");
 const TeacherPayment = require("../models/TeacherPaymentModel.js");
+const OrderNotification = require("../models/orderNotificationModel.js");
 const Favorite = require("../models/favorite.js");
 const Rating = require("../models/ratingModel.js");
 const fs = require("fs");
@@ -1146,9 +1147,10 @@ const checkout = asyncHandler(async (req, res) => {
 
     const savedOrder = await order.save();
 
-    const user = User.findById(userID);
-    console.log(user.firebase_token);
-    if (user.firebase_token) {
+    const user = await User.findById(userID);
+    console.log(savedOrder);
+
+    if (user.firebase_token || user.firebase_token == "dummy_token") {
       const registrationToken = user.firebase_token;
       const title = "Order Placed";
       const body = `Your order has been successfully placed!`;
@@ -1159,7 +1161,7 @@ const checkout = asyncHandler(async (req, res) => {
       } else {
         console.error("Failed to send notification:", notificationResult.error);
       }
-      await addNotification(savedOrder.user_id, savedOrder._id, savedOrder.total_amount, title, "order");
+      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, title, "order");
     }
 
     // Update product stock and clear user's cart
@@ -1177,6 +1179,33 @@ const checkout = asyncHandler(async (req, res) => {
     console.error("Error during checkout:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
+});
+
+const getOrderNotifications = asyncHandler(async (req, res) => {
+      const userID = req.headers.userID;
+
+      try {
+          // Validate userID
+          if (!userID) {
+              return res.status(400).json({ message: "User ID is required", status: false });
+          }
+
+          // Fetch notifications for the user
+          const notifications = await OrderNotification.find({ user_id: userID }).sort({ created_at: -1 });
+
+          if (!notifications || notifications.length === 0) {
+              return res.status(404).json({ message: "No notifications found", status: false });
+          }
+
+          res.status(200).json({
+              status: true,
+              message: "Notifications retrieved successfully",
+              notifications
+          });
+      } catch (error) {
+          console.error("Error retrieving notifications:", error.message);
+          res.status(500).json({ message: "Internal Server Error", status: false });
+      }
 });
 
 const generateVerificationCode = () => {
@@ -2420,4 +2449,5 @@ module.exports = {
   getAllOrders,
   getUserOrderInAdmin,
   getAllSupplier,
+  getOrderNotifications,
 };

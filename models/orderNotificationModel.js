@@ -1,12 +1,12 @@
 const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema({
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  order_id: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true },
+  user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  order_id: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
   message: { type: String },
   title: { type: String },
   type: { type: String },
-  totalamount: { type: Number, required: true },
+  totalamount: { type: Number },
   created_at: { type: Date, default: Date.now },
 });
 

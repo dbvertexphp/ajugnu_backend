@@ -47,6 +47,8 @@ const {
   getAllOrders,
   getUserOrderInAdmin,
   getAllSupplier,
+  getOrderNotifications,
+
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -55,7 +57,7 @@ const commonProtect = require("../middleware/comman_authMiddleware.js");
 const Authorization = require("../middleware/Authorization.middleware.js");
 const { addRating, getRatingsByTeacherId } = require("../controllers/ratingController.js");
 const { addTeacherPaymentStatus, getTeacherPaymentStatuses, calculatePayment, getTeacherPaymentStatusById } = require("../controllers/teacherPaymentStatusController.js");
-
+const {getPopularProduct} = require("../controllers/supplierController.js");
 const userRoutes = express.Router();
 
 /*------------- Student/Teacher Both apis --------------------- */
@@ -86,6 +88,8 @@ userRoutes.route("/checkout").post(protect, Authorization(["user"]), checkout);
 userRoutes.route("/removeFromCart").post(protect, Authorization(["user"]), removeFromCart);
 userRoutes.route("/getUserOrderDetails").get(protect, Authorization(["user"]), getUserOrderDetails);
 userRoutes.route("/addRating").post(protect, Authorization(["user"]), addRating);
+userRoutes.route("/getOrderNotifications").get(protect, getOrderNotifications);
+userRoutes.route("/getPopularProduct").get(protect, getPopularProduct);
 
 userRoutes.route("/getCoursesByUserId").get(protect, Authorization(["student"]), getCoursesByUserId);
 userRoutes.route("/getAllUsers").get(protect, Authorization(["student", "admin"]), getAllUsers);

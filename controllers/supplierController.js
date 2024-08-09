@@ -740,4 +740,26 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId, getAllProductsInAdmin, updateProductStatus };
+const getPopularProduct = asyncHandler(async (req, res) => {
+      try {
+        // Define criteria for popularity, e.g., highest average rating or most sales
+        const popularProducts = await Product.find({ active: true })
+          .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
+          .limit(10); // Limit to top 10 popular products
+
+        if (popularProducts.length === 0) {
+          return res.status(404).json({ message: "No popular products found", status: false });
+        }
+
+        res.status(200).json({
+          status: true,
+          message: "Popular products retrieved successfully",
+          products: popularProducts,
+        });
+      } catch (error) {
+        console.error("Error fetching popular products:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId, getAllProductsInAdmin, updateProductStatus, getPopularProduct };
