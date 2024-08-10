@@ -50,7 +50,6 @@ const productSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    pin_code: [Number],
     averageRating: {
       type: Number,
       default: 0,

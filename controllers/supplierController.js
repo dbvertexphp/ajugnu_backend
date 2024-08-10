@@ -155,27 +155,16 @@ const addProduct = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(err.message, 400));
     }
 
-    const { english_name, local_name, other_name, category_id, price, quantity, product_type, product_role, product_size, description, pin_code } = req.body;
+    const { english_name, local_name, other_name, category_id, price, quantity, product_type, product_role, product_size, description } = req.body;
     const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
     try {
-      // Handle pin_code as an array
-      const pinCodesArray = Array.isArray(pin_code) ? pin_code : [pin_code];
 
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
       if (!user) {
         return res.status(404).json({ message: "User not found", status: false });
       }
-
-      const userPinCodes = user.pin_code || [];
-
-      // Check if provided pin codes exist in the user's pin_code array
-      const invalidPinCodes = pinCodesArray.filter((pin) => !userPinCodes.includes(pin));
-      if (invalidPinCodes.length > 0) {
-        return res.status(400).json({ message: `Invalid pin codes: ${invalidPinCodes.join(", ")}`, status: false });
-      }
-
       // Get the profile picture paths if uploaded
       const product_images = req.files ? req.files.map((file) => `${req.uploadPath}/${file.filename}`) : [];
 
@@ -193,7 +182,6 @@ const addProduct = asyncHandler(async (req, res, next) => {
         product_size,
         description,
         supplier_id,
-        pin_code: pinCodesArray,
       });
 
       const savedProduct = await newProduct.save();
@@ -212,7 +200,6 @@ const addProduct = asyncHandler(async (req, res, next) => {
         product_size: savedProduct.product_size,
         description: savedProduct.description,
         supplier_id: savedProduct.supplier_id,
-        pin_code: savedProduct.pin_code,
         status: true,
       });
     } catch (error) {
@@ -743,42 +730,64 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
 });
 
 const getPopularProduct = asyncHandler(async (req, res) => {
-  const userID = req.headers.userID;
-  try {
-    // Define criteria for popularity, e.g., highest average rating or most sales
-    const popularProducts = await Product.find({ active: true })
-      .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
-      .limit(10) // Limit to top 10 popular products
-      .populate('category_id', '_id category_name'); // Populate category data
+      const userID = req.headers.userID;
 
-    if (popularProducts.length === 0) {
-      return res.status(404).json({ message: "No popular products found", status: false });
-    }
-    // For each product, check if it is favorited by the user
-    const productsWithFavoriteStatus = await Promise.all(
-      popularProducts.map(async (product) => {
-        const isFavorite = await Favorite.findOne({
-          user_id: userID,
-          product_id: product._id,
+      try {
+        // Fetch the user data to get their pin code
+        const user = await User.findById(userID);
+        if (!user) {
+          return res.status(404).json({ message: "User not found", status: false });
+        }
+
+        const userPinCode = user.pin_code; // Assuming pin_code is an array
+
+        // Find all suppliers whose pin codes match the user's pin code
+        const matchingSuppliers = await User.find({
+          role: 'supplier',
+          pin_code: { $in: userPinCode },
+        }).select('_id');
+
+        const supplierIds = matchingSuppliers.map(supplier => supplier._id);
+
+        // Fetch products from suppliers with matching pin codes
+        const popularProducts = await Product.find({
+          active: true,
+          supplier_id: { $in: supplierIds }, // Filter products by matching supplier IDs
+        })
+          .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
+          .limit(10) // Limit to top 10 popular products
+          .populate('category_id', '_id category_name'); // Populate category data with _id and category_name
+
+        if (popularProducts.length === 0) {
+          return res.status(404).json({ message: "No popular products found", status: false });
+        }
+
+        // For each product, check if it is favorited by the user
+        const productsWithFavoriteStatus = await Promise.all(
+          popularProducts.map(async (product) => {
+            const isFavorite = await Favorite.findOne({
+              user_id: userID,
+              product_id: product._id,
+            });
+
+            return {
+              ...product.toObject(),
+              isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
+            };
+          })
+        );
+
+        res.status(200).json({
+          status: true,
+          message: "Popular products retrieved successfully",
+          products: productsWithFavoriteStatus,
         });
-
-        return {
-          ...product.toObject(),
-          isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
-        };
-      })
-    );
-
-    res.status(200).json({
-      status: true,
-      message: "Popular products retrieved successfully",
-      products: productsWithFavoriteStatus,
+      } catch (error) {
+        console.error("Error fetching popular products:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
-  } catch (error) {
-    console.error("Error fetching popular products:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+
 
 const getSupplierOrderNotification = asyncHandler(async (req, res) => {
   const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
