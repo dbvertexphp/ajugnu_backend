@@ -706,11 +706,16 @@ const getProductByCategory_id = asyncHandler(async (req, res) => {
 // Controller function to search products
 const searchProducts = asyncHandler(async (req, res) => {
   const { q } = req.body; // Query parameter for search terms
+  const userID = req.headers.userID;
 
   try {
     // Validate search query
     if (!q) {
       return res.status(400).json({ message: "Search query is required", status: false });
+    }
+
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
     }
 
     // Create a regex pattern for case-insensitive search
@@ -719,17 +724,32 @@ const searchProducts = asyncHandler(async (req, res) => {
     // Fetch products matching the search query
     const products = await Product.find({
       $or: [{ english_name: regex }, { local_name: regex }, { other_name: regex }],
-    });
+    }).populate('category_id', '_id category_name');
 
     // Check if products are found
     if (!products.length) {
       return res.status(404).json({ message: "No products found matching the search query", status: false });
     }
 
-    // Return the products
+    // For each product, check if it is favorited by the user
+    const productsWithFavoriteStatus = await Promise.all(
+      products.map(async (product) => {
+        const isFavorite = await Favorite.findOne({
+          user_id: userID,
+          product_id: product._id,
+        });
+
+        return {
+          ...product.toObject(),
+          isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
+        };
+      })
+    );
+
+    // Return the products with favorite status
     res.status(200).json({
       status: true,
-      products,
+      products: productsWithFavoriteStatus,
     });
   } catch (error) {
     console.error("Error searching products:", error.message);
@@ -1085,122 +1105,122 @@ const decreaseCartQuantity = asyncHandler(async (req, res) => {
 });
 
 const checkout = asyncHandler(async (req, res) => {
-      const userID = req.headers.userID;
-      const { shipping_address, payment_method } = req.body;
+  const userID = req.headers.userID;
+  const { shipping_address, payment_method } = req.body;
 
-      try {
-        // Validate userID, shipping_address, and payment_method (as before)
+  try {
+    // Validate userID, shipping_address, and payment_method (as before)
 
-        // Find all cart items for the user
-        const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+    // Find all cart items for the user
+    const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
 
-        if (!cartItems || cartItems.length === 0) {
-          return res.status(404).json({ message: "No items found in cart", status: false });
-        }
+    if (!cartItems || cartItems.length === 0) {
+      return res.status(404).json({ message: "No items found in cart", status: false });
+    }
 
-        // Calculate total amount and validate stock
-        let totalAmount = 0;
-        const verificationCodes = {};
-        const supplierIds = new Set(); // Create a Set to collect unique supplier IDs
+    // Calculate total amount and validate stock
+    let totalAmount = 0;
+    const verificationCodes = {};
+    const supplierIds = new Set(); // Create a Set to collect unique supplier IDs
 
-        const items = cartItems.map((item) => {
-          if (item.quantity > item.product_id.quantity) {
-            return res.status(400).json({ message: `Requested quantity for ${item.product_id.english_name} exceeds available stock`, status: false });
-          }
-          totalAmount += item.product_id.price * item.quantity;
-
-          // Add supplier ID to the Set
-          supplierIds.add(item.product_id.supplier_id.toString());
-
-          // Generate a unique verification code for each supplier_id
-          const supplierId = item.product_id.supplier_id.toString();
-          if (!verificationCodes[supplierId]) {
-            verificationCodes[supplierId] = generateVerificationCode();
-          }
-
-          return {
-            product_id: item.product_id._id,
-            quantity: item.quantity,
-            supplier_id: supplierId,
-            verification_code: verificationCodes[supplierId],
-            status: "order",
-          };
-        });
-
-        // Generate a unique order ID and create the order (as before)
-        const orderId = generateOrderID();
-
-        const order = new Order({
-          order_id: orderId,
-          user_id: userID,
-          items,
-          shipping_address,
-          payment_method,
-          total_amount: totalAmount,
-        });
-
-        const savedOrder = await order.save();
-
-        // Send notification to the user
-        const user = await User.findById(userID);
-        if (user.firebase_token || user.firebase_token == "dummy_token") {
-          const registrationToken = user.firebase_token;
-          const title = "Order Placed";
-          const body = `Your order has been successfully placed!`;
-
-          const notificationResult = await sendFCMNotification(registrationToken, title, body);
-          if (notificationResult.success) {
-            console.log("Notification sent successfully:", notificationResult.response);
-          } else {
-            console.error("Failed to send notification:", notificationResult.error);
-          }
-
-          // Pass supplier IDs as an array to the addNotification function
-          await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount,Array.from(supplierIds), title, "order");
-        }
-
-        // Update product stock and clear user's cart (as before)
-        for (const item of cartItems) {
-          await Product.findByIdAndUpdate(item.product_id._id, { $inc: { quantity: -item.quantity } });
-        }
-        await Cart.deleteMany({ user_id: userID });
-
-        res.status(201).json({
-          status: true,
-          message: "Order placed successfully",
-          order: savedOrder,
-        });
-      } catch (error) {
-        console.error("Error during checkout:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+    const items = cartItems.map((item) => {
+      if (item.quantity > item.product_id.quantity) {
+        return res.status(400).json({ message: `Requested quantity for ${item.product_id.english_name} exceeds available stock`, status: false });
       }
+      totalAmount += item.product_id.price * item.quantity;
+
+      // Add supplier ID to the Set
+      supplierIds.add(item.product_id.supplier_id.toString());
+
+      // Generate a unique verification code for each supplier_id
+      const supplierId = item.product_id.supplier_id.toString();
+      if (!verificationCodes[supplierId]) {
+        verificationCodes[supplierId] = generateVerificationCode();
+      }
+
+      return {
+        product_id: item.product_id._id,
+        quantity: item.quantity,
+        supplier_id: supplierId,
+        verification_code: verificationCodes[supplierId],
+        status: "order",
+      };
+    });
+
+    // Generate a unique order ID and create the order (as before)
+    const orderId = generateOrderID();
+
+    const order = new Order({
+      order_id: orderId,
+      user_id: userID,
+      items,
+      shipping_address,
+      payment_method,
+      total_amount: totalAmount,
+    });
+
+    const savedOrder = await order.save();
+
+    // Send notification to the user
+    const user = await User.findById(userID);
+    if (user.firebase_token || user.firebase_token == "dummy_token") {
+      const registrationToken = user.firebase_token;
+      const title = "Order Placed";
+      const body = `Your order has been successfully placed!`;
+
+      const notificationResult = await sendFCMNotification(registrationToken, title, body);
+      if (notificationResult.success) {
+        console.log("Notification sent successfully:", notificationResult.response);
+      } else {
+        console.error("Failed to send notification:", notificationResult.error);
+      }
+
+      // Pass supplier IDs as an array to the addNotification function
+      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, Array.from(supplierIds), title, "order");
+    }
+
+    // Update product stock and clear user's cart (as before)
+    for (const item of cartItems) {
+      await Product.findByIdAndUpdate(item.product_id._id, { $inc: { quantity: -item.quantity } });
+    }
+    await Cart.deleteMany({ user_id: userID });
+
+    res.status(201).json({
+      status: true,
+      message: "Order placed successfully",
+      order: savedOrder,
+    });
+  } catch (error) {
+    console.error("Error during checkout:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getOrderNotifications = asyncHandler(async (req, res) => {
-      const userID = req.headers.userID;
+  const userID = req.headers.userID;
 
-      try {
-          // Validate userID
-          if (!userID) {
-              return res.status(400).json({ message: "User ID is required", status: false });
-          }
+  try {
+    // Validate userID
+    if (!userID) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
 
-          // Fetch notifications for the user
-          const notifications = await OrderNotification.find({ user_id: userID }).sort({ created_at: -1 });
+    // Fetch notifications for the user
+    const notifications = await OrderNotification.find({ user_id: userID }).sort({ created_at: -1 });
 
-          if (!notifications || notifications.length === 0) {
-              return res.status(404).json({ message: "No notifications found", status: false });
-          }
+    if (!notifications || notifications.length === 0) {
+      return res.status(404).json({ message: "No notifications found", status: false });
+    }
 
-          res.status(200).json({
-              status: true,
-              message: "Notifications retrieved successfully",
-              notifications
-          });
-      } catch (error) {
-          console.error("Error retrieving notifications:", error.message);
-          res.status(500).json({ message: "Internal Server Error", status: false });
-      }
+    res.status(200).json({
+      status: true,
+      message: "Notifications retrieved successfully",
+      notifications,
+    });
+  } catch (error) {
+    console.error("Error retrieving notifications:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
 });
 
 const generateVerificationCode = () => {

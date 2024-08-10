@@ -14,7 +14,7 @@ const Order = require("../models/orderModel.js");
 const { addNotification } = require("./orderNotificationController");
 const { sendFCMNotification } = require("./notificationControllers");
 const OrderNotification = require("../models/orderNotificationModel.js");
-
+const Favorite = require("../models/favorite.js");
 
 dotenv.config();
 
@@ -743,49 +743,82 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
 });
 
 const getPopularProduct = asyncHandler(async (req, res) => {
-      try {
-        // Define criteria for popularity, e.g., highest average rating or most sales
-        const popularProducts = await Product.find({ active: true })
-          .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
-          .limit(10); // Limit to top 10 popular products
+  const userID = req.headers.userID;
+  try {
+    // Define criteria for popularity, e.g., highest average rating or most sales
+    const popularProducts = await Product.find({ active: true })
+      .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
+      .limit(10) // Limit to top 10 popular products
+      .populate('category_id', '_id category_name'); // Populate category data
 
-        if (popularProducts.length === 0) {
-          return res.status(404).json({ message: "No popular products found", status: false });
-        }
-
-        res.status(200).json({
-          status: true,
-          message: "Popular products retrieved successfully",
-          products: popularProducts,
+    if (popularProducts.length === 0) {
+      return res.status(404).json({ message: "No popular products found", status: false });
+    }
+    // For each product, check if it is favorited by the user
+    const productsWithFavoriteStatus = await Promise.all(
+      popularProducts.map(async (product) => {
+        const isFavorite = await Favorite.findOne({
+          user_id: userID,
+          product_id: product._id,
         });
-      } catch (error) {
-        console.error("Error fetching popular products:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+
+        return {
+          ...product.toObject(),
+          isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
+        };
+      })
+    );
+
+    res.status(200).json({
+      status: true,
+      message: "Popular products retrieved successfully",
+      products: productsWithFavoriteStatus,
+    });
+  } catch (error) {
+    console.error("Error fetching popular products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getSupplierOrderNotification = asyncHandler(async (req, res) => {
-      const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
+  const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
 
-      try {
-        if (!supplierId) {
-          return res.status(400).json({ message: "Supplier ID is required", status: false });
-        }
+  try {
+    if (!supplierId) {
+      return res.status(400).json({ message: "Supplier ID is required", status: false });
+    }
 
-        const notifications = await OrderNotification.find({ supplier_ids: supplierId });
+    const notifications = await OrderNotification.find({ supplier_ids: supplierId });
 
-        if (!notifications || notifications.length === 0) {
-          return res.status(404).json({ message: "No notifications found", status: false });
-        }
+    if (!notifications || notifications.length === 0) {
+      return res.status(404).json({ message: "No notifications found", status: false });
+    }
 
-        res.status(200).json({
-          status: true,
-          notifications: notifications,
-        });
-      } catch (error) {
-        console.error("Error fetching supplier order notifications:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+    res.status(200).json({
+      status: true,
+      notifications: notifications,
     });
+  } catch (error) {
+    console.error("Error fetching supplier order notifications:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
-module.exports = { updateSupplierProfileData, addProduct, getSupplierProfileData, getProducts, getPincode, editProduct, deleteProduct, getProductById, getOrdersBySupplierId, updateOrderItemStatus, getAllProducts, getProductsBySupplierId, getAllProductsInAdmin, updateProductStatus, getPopularProduct, getSupplierOrderNotification };
+module.exports = {
+  updateSupplierProfileData,
+  addProduct,
+  getSupplierProfileData,
+  getProducts,
+  getPincode,
+  editProduct,
+  deleteProduct,
+  getProductById,
+  getOrdersBySupplierId,
+  updateOrderItemStatus,
+  getAllProducts,
+  getProductsBySupplierId,
+  getAllProductsInAdmin,
+  updateProductStatus,
+  getPopularProduct,
+  getSupplierOrderNotification,
+};
