@@ -48,6 +48,7 @@ const {
   getUserOrderInAdmin,
   getAllSupplier,
   getOrderNotifications,
+  getProductsByOrderAndSupplier
 
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
@@ -107,6 +108,7 @@ userRoutes.route("/calculatePayment").post(protect, Authorization(["teacher"]), 
 /*------------- Admin apis --------------------- */
 userRoutes.route("/getAllOrders").get(protect, Authorization(["admin"]), getAllOrders);
 userRoutes.route("/getUserOrderInAdmin").post(protect, Authorization(["admin"]), getUserOrderInAdmin);
+userRoutes.route("/getProductsByOrderAndSupplier/:order_id").get(protect, Authorization(["admin"]), getProductsByOrderAndSupplier);
 
 userRoutes.route("/getTeacherPaymentStatuses").get(protect, Authorization(["admin"]), getTeacherPaymentStatuses);
 userRoutes.route("/getTeacherPaymentStatusById/:teacher_id").get(protect, Authorization(["admin"]), getTeacherPaymentStatusById);

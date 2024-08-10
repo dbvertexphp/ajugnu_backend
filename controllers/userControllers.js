@@ -1290,6 +1290,70 @@ const getAllOrders = asyncHandler(async (req, res) => {
   }
 });
 
+const getProductsByOrderAndSupplier = asyncHandler(async (req, res) => {
+      const { order_id } = req.params;
+
+      try {
+        // Validate order_id
+        if (!order_id) {
+          return res.status(400).json({ message: 'Order ID is required', status: false });
+        }
+
+        // Find the order
+        const order = await Order.findById(order_id)
+        .populate("user_id", "full_name email") // Populate user details
+        .populate("items.product_id", "english_name price") // Populate product details
+        .populate("items.supplier_id", "full_name") // Populate user details // Populate supplier details for items
+      .exec();
+
+        if (!order) {
+          return res.status(404).json({ message: 'Order not found', status: false });
+        }
+
+        // Get product IDs from the order
+        const productIds = order.items.map(item => item.product_id).filter(id => id); // Filter out null values
+
+        // Fetch product details
+        const products = await Product.find({ _id: { $in: productIds } })
+          .populate('supplier_id', 'full_name') // Populate supplier details if needed
+          .exec();
+
+        res.status(200).json({
+          order: {
+            _id: order._id,
+            order_id: order.order_id,
+            shipping_address: order.shipping_address,
+            user_id: {
+              _id: order.user_id._id,
+              full_name: order.user_id.full_name,
+              email: order.user_id.email,
+            },
+            items: order.items.map(item => ({
+              _id: item._id,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              status: item.status,
+              verification_code: item.verification_code,
+              supplier_id: {
+                _id: item.supplier_id._id,
+                full_name: item.supplier_id.full_name
+              }
+            })),
+            payment_method: order.payment_method,
+            total_amount: order.total_amount,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+            payment_status: order.payment_status,
+          },
+          products,
+          status: true,
+        });
+      } catch (error) {
+        console.error('Error fetching products by order:', error.message);
+        res.status(500).json({ message: 'Internal Server Error', status: false });
+      }
+});
+
 const getUserOrderInAdmin = asyncHandler(async (req, res) => {
   const { userID } = req.body;
 
@@ -1441,8 +1505,8 @@ const getUserOrderDetails = asyncHandler(async (req, res) => {
 });
 
 const bank_Detail_create = asyncHandler(async (req, res) => {
-  const { bankName, accountNumber, ifscCode, bankAddress, teacherName } = req.body;
-  const userId = req.headers.userID; // Assuming you have user authentication middleware
+  const { bankName, accountNumber, ifscCode, bankAddress, supplierName } = req.body;
+  const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
 
   try {
     // Create bank details
@@ -1451,8 +1515,8 @@ const bank_Detail_create = asyncHandler(async (req, res) => {
       accountNumber,
       ifscCode,
       bankAddress,
-      teacherName,
-      userId,
+      supplierName,
+      supplier_id,
     });
     res.status(201).json({
       bankDetails,
@@ -1467,11 +1531,11 @@ const bank_Detail_create = asyncHandler(async (req, res) => {
 });
 
 const getBankDetails = asyncHandler(async (req, res) => {
-  const userId = req.headers.userID; // Assuming you have user authentication middleware
+  const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
 
   try {
     // Find bank details for the given user ID
-    const bankDetails = await BankDetails.findOne({ userId });
+    const bankDetails = await BankDetails.findOne({ supplier_id });
 
     if (bankDetails) {
       res.status(200).json({
@@ -1493,11 +1557,11 @@ const getBankDetails = asyncHandler(async (req, res) => {
 });
 
 const getBankDetailsAdmin = asyncHandler(async (req, res) => {
-  const { teacher_id } = req.params; // Extracting user_id from request parameters
+  const { supplier_id } = req.params; // Extracting user_id from request parameters
 
   try {
     // Find bank details for the given user ID
-    const bankDetails = await BankDetails.findOne({ userId: teacher_id });
+    const bankDetails = await BankDetails.findOne({ supplier_id: supplier_id });
 
     if (bankDetails) {
       res.status(200).json({
@@ -2070,6 +2134,7 @@ const getCoursesByTeacherId = asyncHandler(async (req, res) => {
     });
   }
 });
+
 const getTeacherAndCourseByTeacher_IdAndType = async (req, res, next) => {
   const { teacher_id, type } = req.body;
   const user_id = req.headers.userID;
@@ -2465,4 +2530,5 @@ module.exports = {
   getUserOrderInAdmin,
   getAllSupplier,
   getOrderNotifications,
+  getProductsByOrderAndSupplier
 };

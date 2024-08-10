@@ -564,7 +564,6 @@ const getPincode = asyncHandler(async (req, res) => {
 
 const getOrdersBySupplierId = asyncHandler(async (req, res) => {
       const supplier_id = req.headers.userID;
-
       try {
         // Validate supplier_id
         if (!supplier_id) {
@@ -640,8 +639,7 @@ const getOrdersBySupplierId = asyncHandler(async (req, res) => {
         console.error("Error fetching supplier order details:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
       }
-    });
-
+});
 
 const updateOrderItemStatus = asyncHandler(async (req, res) => {
   const { order_id, product_id, new_status } = req.body;
@@ -787,8 +785,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
         console.error("Error fetching popular products:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
       }
-    });
-
+});
 
 const getSupplierOrderNotification = asyncHandler(async (req, res) => {
   const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
