@@ -8,7 +8,6 @@ const notificationSchema = new mongoose.Schema({
   type: { type: String },
   totalamount: { type: Number },
   supplier_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-
   created_at: { type: Date, default: Date.now },
 });
 

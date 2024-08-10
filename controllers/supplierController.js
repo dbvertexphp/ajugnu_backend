@@ -563,90 +563,89 @@ const getPincode = asyncHandler(async (req, res) => {
 });
 
 const getOrdersBySupplierId = asyncHandler(async (req, res) => {
-  const supplier_id = req.headers.userID;
+      const supplier_id = req.headers.userID;
 
-  try {
-    // Validate supplier_id
-    if (!supplier_id) {
-      return res.status(400).json({ message: "supplier_id is required", status: false });
-    }
+      try {
+        // Validate supplier_id
+        if (!supplier_id) {
+          return res.status(400).json({ message: "supplier_id is required", status: false });
+        }
 
-    // Find all orders for the supplier
-    const orders = await Order.find({ "items.supplier_id": supplier_id }).populate({
-      path: "items.product_id",
-      populate: {
-        path: "supplier_id",
-        select: "full_name", // Assuming supplier schema has a field 'full_name'
-      },
-    });
-
-    if (!orders || orders.length === 0) {
-      return res.status(404).json({ message: "No orders found for this supplier", status: false });
-    }
-
-    // Organize order details
-    const response = orders
-      .map((order) => {
-        const supplierDetails = {};
-        order.items.forEach((item) => {
-          if (item.supplier_id.toString() === supplier_id) {
-            if (!supplierDetails[supplier_id]) {
-              supplierDetails[supplier_id] = {
-                total_amount: 0,
-                full_name: item.product_id.supplier_id.full_name,
-                verification_code: item.verification_code,
-                products: [],
-              };
-            }
-
-            supplierDetails[supplier_id].total_amount += item.product_id.price * item.quantity;
-            supplierDetails[supplier_id].products.push({
-              status: item.status,
-              product_id: item.product_id._id,
-              quantity: item.quantity,
-              price: item.product_id.price,
-              product_images: item.product_id.product_images,
-              product_name: item.product_id.english_name,
-            });
-          }
+        // Find all orders for the supplier
+        const orders = await Order.find({ "items.supplier_id": supplier_id }).populate({
+          path: "items.product_id",
+          populate: {
+            path: "supplier_id",
+            select: "full_name", // Assuming supplier schema has a field 'full_name'
+          },
         });
 
-        return {
-          _id: order._id,
-          order_id: order.order_id,
-          order_status: order.status,
-          payment_method: order.payment_method,
-          created_at: order.createdAt,
-          updated_at: order.updatedAt,
-          details: supplierDetails[supplier_id]
-            ? [
-                {
-                  supplier_id: supplier_id,
-                  full_name: supplierDetails[supplier_id].full_name,
-                  verification_code: supplierDetails[supplier_id].verification_code,
-                  total_amount: supplierDetails[supplier_id].total_amount,
-                  products: supplierDetails[supplier_id].products,
-                },
-              ]
-            : [],
-        };
-      })
-      .filter((order) => order.details.length > 0); // Filter out orders with no matching details
+        if (!orders || orders.length === 0) {
+          return res.status(404).json({ message: "No orders found for this supplier", status: false });
+        }
 
-    res.status(200).json({
-      status: true,
-      message: "Supplier order details fetched successfully",
-      orders: response,
+        // Organize order details
+        const response = orders.map((order) => {
+          const supplierDetails = {};
+          order.items.forEach((item) => {
+            if (item.product_id && item.supplier_id.toString() === supplier_id) {
+              if (!supplierDetails[supplier_id]) {
+                supplierDetails[supplier_id] = {
+                  total_amount: 0,
+                  full_name: item.product_id.supplier_id?.full_name || "Unknown Supplier",
+                  verification_code: item.verification_code,
+                  products: [],
+                };
+              }
+
+              supplierDetails[supplier_id].total_amount += item.product_id.price * item.quantity;
+              supplierDetails[supplier_id].products.push({
+                status: item.status,
+                product_id: item.product_id._id,
+                quantity: item.quantity,
+                price: item.product_id.price,
+                product_images: item.product_id.product_images,
+                product_name: item.product_id.english_name,
+              });
+            }
+          });
+
+          return {
+            _id: order._id,
+            order_id: order.order_id,
+            order_status: order.status,
+            payment_method: order.payment_method,
+            created_at: order.createdAt,
+            updated_at: order.updatedAt,
+            details: supplierDetails[supplier_id]
+              ? [
+                  {
+                    supplier_id: supplier_id,
+                    full_name: supplierDetails[supplier_id].full_name,
+                    verification_code: supplierDetails[supplier_id].verification_code,
+                    total_amount: supplierDetails[supplier_id].total_amount,
+                    products: supplierDetails[supplier_id].products,
+                  },
+                ]
+              : [],
+          };
+        }).filter((order) => order.details.length > 0); // Filter out orders with no matching details
+
+        res.status(200).json({
+          status: true,
+          message: "Supplier order details fetched successfully",
+          orders: response,
+        });
+      } catch (error) {
+        console.error("Error fetching supplier order details:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
-  } catch (error) {
-    console.error("Error fetching supplier order details:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+
 
 const updateOrderItemStatus = asyncHandler(async (req, res) => {
   const { order_id, product_id, new_status } = req.body;
-
+  const supplier_id = req.headers.userID;
   try {
     // Validate input
     if (!order_id || !product_id || !new_status) {
@@ -660,7 +659,7 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
     }
 
     // Find and update the order item
-    const order = await Order.findOneAndUpdate(
+    const savedOrder = await Order.findOneAndUpdate(
       { _id: order_id, "items.product_id": product_id },
       {
         $set: {
@@ -671,12 +670,14 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
       { new: true }
     );
 
-    if (!order) {
+    if (!savedOrder) {
       return res.status(404).json({ message: "Order or item not found", status: false });
     } else {
-      const order = Order.findById(order_id);
+      const order = await Order.findById(order_id);
       const user = await User.findById(order.user_id);
-      if (user.firebase_token) {
+      console.log(order.user_id);
+
+      if (user.firebase_token || user.firebase_token == "dummy_token") {
         const registrationToken = user.firebase_token;
 
         let title;
@@ -704,22 +705,22 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
         } else {
           console.error("Failed to send notification:", notificationResult.error);
         }
-      }
 
-      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, title, new_status);
+        await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, [supplier_id], title, new_status);
+      }
     }
 
     // Filter items to include only those with the same supplier_id as the updated item
-    const updatedItem = order.items.find((item) => item.product_id.toString() === product_id);
+    const updatedItem = savedOrder.items.find((item) => item.product_id.toString() === product_id);
     const supplierId = updatedItem ? updatedItem.supplier_id : null;
 
-    const filteredItems = order.items.filter((item) => item.supplier_id.toString() === supplierId.toString());
+    const filteredItems = savedOrder.items.filter((item) => item.supplier_id.toString() === supplierId.toString());
 
     res.status(200).json({
       status: true,
       message: "Order item status updated successfully",
       order: {
-        ...order.toObject(),
+        ...savedOrder.toObject(),
         items: filteredItems, // Include only the filtered items in the response
       },
     });
