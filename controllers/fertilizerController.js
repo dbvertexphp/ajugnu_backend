@@ -289,8 +289,6 @@ const getAllFertilizer = asyncHandler(async (req, res) => {
 
 const getProductsBySupplierId = asyncHandler(async (req, res) => {
   const { supplier_id } = req.body; // Assuming user authentication middleware sets this header
-  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
-  const limit = 10; // Number of products per page
 
   try {
     if (!supplier_id) {
@@ -300,14 +298,12 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
       });
     }
 
-    const skip = (page - 1) * limit;
-    const totalProducts = await Fertilizer.countDocuments({ supplier_id });
-    const products = await Fertilizer.find({ supplier_id }).skip(skip).limit(limit);
+    const totalProducts = await Product.countDocuments({ supplier_id });
+    const products = await Product.find({ supplier_id });
+    console.log(products);
 
     res.status(200).json({
       products,
-      page,
-      totalPages: Math.ceil(totalProducts / limit),
       totalProducts,
       status: true,
     });
@@ -393,8 +389,8 @@ const getOrdersBySupplierId = asyncHandler(async (req, res) => {
           order_id: order.order_id,
           order_status: order.status,
           payment_method: order.payment_method,
-          created_at: order.createdAt,
-          updated_at: order.updatedAt,
+          created_at: order.created_at,
+          updated_at: order.updated_at,
           details: supplierDetails[supplier_id]
             ? [
                 {

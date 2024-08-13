@@ -15,22 +15,19 @@ const transactionSchema = new Schema(
       ref: "Order",
       required: true,
     },
-    transaction_id: {
-      type: String,
-      required: true,
-    },
     payment_id: {
       type: String,
-      required: true,
     },
     payment_status: {
       type: String,
       required: true,
     },
+    status: { type: String, enum: ["order", "confirmed", "shipped", "ontheway", "delivered", "cancelled"], default: "order" },
     total_amount: {
       type: Number,
       required: true,
     },
+    payment_method: { type: String, enum: ["online", "cod"], required: true },
     items: [
       {
         product_id: {

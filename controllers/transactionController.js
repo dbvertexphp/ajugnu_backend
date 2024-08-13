@@ -8,9 +8,11 @@ const { sendFCMNotification } = require("./notificationControllers");
 
 const addTransaction = asyncHandler(async (req, res) => {
   const user_id = req.headers.userID;
-  const { order_id, transaction_id, payment_id, payment_status, total_amount } = req.body;
+  const { order_id, payment_id, payment_status, total_amount, payment_method, status } = req.body;
+  console.log(req.body);
 
-  if (!user_id || !order_id || !transaction_id || !payment_id || !payment_status || !total_amount) {
+
+  if ( !order_id || !payment_status || !total_amount || !payment_method || !status) {
     return res.status(400).json({ message: "Invalid input", status: false });
   }
 
@@ -32,10 +34,11 @@ const addTransaction = asyncHandler(async (req, res) => {
     const newTransaction = new Transaction({
       user_id,
       order_id,
-      transaction_id,
-      payment_id,
+      payment_id : payment_id || null,
       payment_status,
       total_amount,
+      payment_method,
+      status,
       items,
     });
 
@@ -54,8 +57,9 @@ const addTransaction = asyncHandler(async (req, res) => {
         } else {
           console.error("Failed to send notification:", notificationResult.error);
         }
+        await addNotification(user_id,order_id,body,total_amount, [item.supplier_id],title,payment_method);
       }
-      await addNotification(user_id, item.supplier_id, "New Transaction", `Transaction ID: ${transaction_id}`, item.amount);
+
     }
 
     res.status(201).json({

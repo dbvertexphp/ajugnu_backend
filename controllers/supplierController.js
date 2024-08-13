@@ -159,7 +159,6 @@ const addProduct = asyncHandler(async (req, res, next) => {
     const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
     try {
-
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
       if (!user) {
@@ -376,45 +375,47 @@ const deleteProduct = asyncHandler(async (req, res) => {
 });
 
 const getProducts = asyncHandler(async (req, res) => {
-  const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
-  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
-  const limit = 10; // Number of products per page
+      const supplier_id = req.headers.userID; // Extracting supplier_id from headers
+      const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+      const limit = 10; // Number of products per page
 
-  try {
-    if (!supplier_id) {
-      return res.status(400).json({
-        message: "Supplier ID is required.",
-        status: false,
-      });
-    }
+      try {
+        if (!supplier_id) {
+          return res.status(400).json({
+            message: "Supplier ID is required.",
+            status: false,
+          });
+        }
 
-    const skip = (page - 1) * limit;
-    const totalProducts = await Product.countDocuments({
-      supplier_id,
-      product_role: "supplier",
-      active: true,
-    });
+        const skip = (page - 1) * limit;
+        const totalProducts = await Product.countDocuments({
+          supplier_id,
+          product_role: "supplier",
+          active: true,
+        });
 
-    const products = await Product.find({
-      supplier_id,
-      product_role: "supplier",
-      active: true,
-    })
-      .skip(skip)
-      .limit(limit);
+        const products = await Product.find({
+          supplier_id,
+          product_role: "supplier",
+          active: true,
+        })
+          .sort({ createdAt: -1 }) // Sort by createdAt in descending order
+          .skip(skip)
+          .limit(limit);
 
-    res.status(200).json({
-      products,
-      page,
-      totalPages: Math.ceil(totalProducts / limit),
-      totalProducts,
-      status: true,
-    });
-  } catch (error) {
-    console.error("Error fetching products:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+        res.status(200).json({
+          products,
+          page,
+          totalPages: Math.ceil(totalProducts / limit),
+          totalProducts,
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error fetching products:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
 });
+
 
 const getAllProducts = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
@@ -563,82 +564,84 @@ const getPincode = asyncHandler(async (req, res) => {
 });
 
 const getOrdersBySupplierId = asyncHandler(async (req, res) => {
-      const supplier_id = req.headers.userID;
-      try {
-        // Validate supplier_id
-        if (!supplier_id) {
-          return res.status(400).json({ message: "supplier_id is required", status: false });
-        }
+  const supplier_id = req.headers.userID;
+  try {
+    // Validate supplier_id
+    if (!supplier_id) {
+      return res.status(400).json({ message: "supplier_id is required", status: false });
+    }
 
-        // Find all orders for the supplier
-        const orders = await Order.find({ "items.supplier_id": supplier_id }).populate({
-          path: "items.product_id",
-          populate: {
-            path: "supplier_id",
-            select: "full_name", // Assuming supplier schema has a field 'full_name'
-          },
-        });
+    // Find all orders for the supplier
+    const orders = await Order.find({ "items.supplier_id": supplier_id }).populate({
+      path: "items.product_id",
+      populate: {
+        path: "supplier_id",
+        select: "full_name", // Assuming supplier schema has a field 'full_name'
+      },
+    });
 
-        if (!orders || orders.length === 0) {
-          return res.status(404).json({ message: "No orders found for this supplier", status: false });
-        }
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ message: "No orders found for this supplier", status: false });
+    }
 
-        // Organize order details
-        const response = orders.map((order) => {
-          const supplierDetails = {};
-          order.items.forEach((item) => {
-            if (item.product_id && item.supplier_id.toString() === supplier_id) {
-              if (!supplierDetails[supplier_id]) {
-                supplierDetails[supplier_id] = {
-                  total_amount: 0,
-                  full_name: item.product_id.supplier_id?.full_name || "Unknown Supplier",
-                  verification_code: item.verification_code,
-                  products: [],
-                };
-              }
-
-              supplierDetails[supplier_id].total_amount += item.product_id.price * item.quantity;
-              supplierDetails[supplier_id].products.push({
-                status: item.status,
-                product_id: item.product_id._id,
-                quantity: item.quantity,
-                price: item.product_id.price,
-                product_images: item.product_id.product_images,
-                product_name: item.product_id.english_name,
-              });
+    // Organize order details
+    const response = orders
+      .map((order) => {
+        const supplierDetails = {};
+        order.items.forEach((item) => {
+          if (item.product_id && item.supplier_id.toString() === supplier_id) {
+            if (!supplierDetails[supplier_id]) {
+              supplierDetails[supplier_id] = {
+                total_amount: 0,
+                full_name: item.product_id.supplier_id?.full_name || "Unknown Supplier",
+                verification_code: item.verification_code,
+                products: [],
+              };
             }
-          });
 
-          return {
-            _id: order._id,
-            order_id: order.order_id,
-            order_status: order.status,
-            payment_method: order.payment_method,
-            created_at: order.createdAt,
-            updated_at: order.updatedAt,
-            details: supplierDetails[supplier_id]
-              ? [
-                  {
-                    supplier_id: supplier_id,
-                    full_name: supplierDetails[supplier_id].full_name,
-                    verification_code: supplierDetails[supplier_id].verification_code,
-                    total_amount: supplierDetails[supplier_id].total_amount,
-                    products: supplierDetails[supplier_id].products,
-                  },
-                ]
-              : [],
-          };
-        }).filter((order) => order.details.length > 0); // Filter out orders with no matching details
-
-        res.status(200).json({
-          status: true,
-          message: "Supplier order details fetched successfully",
-          orders: response,
+            supplierDetails[supplier_id].total_amount += item.product_id.price * item.quantity;
+            supplierDetails[supplier_id].products.push({
+              status: item.status,
+              product_id: item.product_id._id,
+              quantity: item.quantity,
+              price: item.product_id.price,
+              product_images: item.product_id.product_images,
+              product_name: item.product_id.english_name,
+            });
+          }
         });
-      } catch (error) {
-        console.error("Error fetching supplier order details:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+
+        return {
+          _id: order._id,
+          order_id: order.order_id,
+          order_status: order.status,
+          payment_method: order.payment_method,
+          created_at: order.created_at,
+          updated_at: order.updated_at,
+          details: supplierDetails[supplier_id]
+            ? [
+                {
+                  supplier_id: supplier_id,
+                  full_name: supplierDetails[supplier_id].full_name,
+                  verification_code: supplierDetails[supplier_id].verification_code,
+                  total_amount: supplierDetails[supplier_id].total_amount,
+                  products: supplierDetails[supplier_id].products,
+                },
+              ]
+            : [],
+        };
+      })
+      .filter((order) => order.details.length > 0); // Filter out orders with no matching details
+
+    res.status(200).json({
+      status: true,
+      message: "Supplier order details fetched successfully",
+      orders: response,
+    });
+  } catch (error) {
+    console.error("Error fetching supplier order details:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const updateOrderItemStatus = asyncHandler(async (req, res) => {
@@ -729,62 +732,62 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
 });
 
 const getPopularProduct = asyncHandler(async (req, res) => {
-      const userID = req.headers.userID;
+  const userID = req.headers.userID;
 
-      try {
-        // Fetch the user data to get their pin code
-        const user = await User.findById(userID);
-        if (!user) {
-          return res.status(404).json({ message: "User not found", status: false });
-        }
+  try {
+    // Fetch the user data to get their pin code
+    const user = await User.findById(userID);
+    if (!user) {
+      return res.status(404).json({ message: "User not found", status: false });
+    }
 
-        const userPinCode = user.pin_code; // Assuming pin_code is an array
+    const userPinCode = user.pin_code; // Assuming pin_code is an array
 
-        // Find all suppliers whose pin codes match the user's pin code
-        const matchingSuppliers = await User.find({
-          role: 'supplier',
-          pin_code: { $in: userPinCode },
-        }).select('_id');
+    // Find all suppliers whose pin codes match the user's pin code
+    const matchingSuppliers = await User.find({
+      role: "supplier",
+      pin_code: { $in: userPinCode },
+    }).select("_id");
 
-        const supplierIds = matchingSuppliers.map(supplier => supplier._id);
+    const supplierIds = matchingSuppliers.map((supplier) => supplier._id);
 
-        // Fetch products from suppliers with matching pin codes
-        const popularProducts = await Product.find({
-          active: true,
-          supplier_id: { $in: supplierIds }, // Filter products by matching supplier IDs
-        })
-          .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
-          .limit(10) // Limit to top 10 popular products
-          .populate('category_id', '_id category_name'); // Populate category data with _id and category_name
+    // Fetch products from suppliers with matching pin codes
+    const popularProducts = await Product.find({
+      active: true,
+      supplier_id: { $in: supplierIds }, // Filter products by matching supplier IDs
+    })
+      .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
+      .limit(10) // Limit to top 10 popular products
+      .populate("category_id", "_id category_name"); // Populate category data with _id and category_name
 
-        if (popularProducts.length === 0) {
-          return res.status(404).json({ message: "No popular products found", status: false });
-        }
+    if (popularProducts.length === 0) {
+      return res.status(404).json({ message: "No popular products found", status: false });
+    }
 
-        // For each product, check if it is favorited by the user
-        const productsWithFavoriteStatus = await Promise.all(
-          popularProducts.map(async (product) => {
-            const isFavorite = await Favorite.findOne({
-              user_id: userID,
-              product_id: product._id,
-            });
-
-            return {
-              ...product.toObject(),
-              isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
-            };
-          })
-        );
-
-        res.status(200).json({
-          status: true,
-          message: "Popular products retrieved successfully",
-          products: productsWithFavoriteStatus,
+    // For each product, check if it is favorited by the user
+    const productsWithFavoriteStatus = await Promise.all(
+      popularProducts.map(async (product) => {
+        const isFavorite = await Favorite.findOne({
+          user_id: userID,
+          product_id: product._id,
         });
-      } catch (error) {
-        console.error("Error fetching popular products:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+
+        return {
+          ...product.toObject(),
+          isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
+        };
+      })
+    );
+
+    res.status(200).json({
+      status: true,
+      message: "Popular products retrieved successfully",
+      products: productsWithFavoriteStatus,
+    });
+  } catch (error) {
+    console.error("Error fetching popular products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getSupplierOrderNotification = asyncHandler(async (req, res) => {
@@ -811,6 +814,95 @@ const getSupplierOrderNotification = asyncHandler(async (req, res) => {
   }
 });
 
+const getFertilizerBySupplierId = asyncHandler(async (req, res) => {
+      const supplier_id = req.headers.userID; // Extracting supplier_id from headers
+
+      try {
+        if (!supplier_id) {
+          return res.status(400).json({
+            message: "Supplier ID is required.",
+            status: false,
+          });
+        }
+
+        const products = await Product.find({ supplier_id, product_role: "fertilizer" });
+
+        res.status(200).json({
+          products,
+          totalProducts: products.length,
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error fetching products:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+});
+
+const getToolsBySupplierId = asyncHandler(async (req, res) => {
+      const supplier_id = req.headers.userID; // Extracting supplier_id from headers
+
+      try {
+        if (!supplier_id) {
+          return res.status(400).json({
+            message: "Supplier ID is required.",
+            status: false,
+          });
+        }
+
+        const products = await Product.find({ supplier_id, product_role: "tools" });
+
+        res.status(200).json({
+          products,
+          totalProducts: products.length,
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error fetching products:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+});
+
+const getAllFertilizerProducts = asyncHandler(async (req, res) => {
+      try {
+        const query = {
+          $and: [
+            { product_role: "fertilizer" }, // Add the condition for product_role
+          ],
+        };
+
+        const fertilizer = await Product.find(query)
+
+        res.status(200).json({
+          fertilizer,
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error fetching fertilizer:", error.message);
+        res.status(500).json({ message: "Internal Server Error", status: false });
+      }
+});
+
+const getAllToolsProducts = asyncHandler(async (req, res) => {
+      try {
+        const query = {
+          $and: [
+            { product_role: "tools" }, // Add the condition for product_role
+          ],
+        };
+
+        const tools = await Product.find(query)
+
+        res.status(200).json({
+            tools,
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error fetching fertilizer:", error.message);
+        res.status(500).json({ message: "Internal Server Error", status: false });
+      }
+});
+
+
 module.exports = {
   updateSupplierProfileData,
   addProduct,
@@ -828,4 +920,8 @@ module.exports = {
   updateProductStatus,
   getPopularProduct,
   getSupplierOrderNotification,
+  getFertilizerBySupplierId,
+  getToolsBySupplierId,
+  getAllFertilizerProducts,
+  getAllToolsProducts
 };

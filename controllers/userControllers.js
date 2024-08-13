@@ -685,7 +685,7 @@ const getProductByCategory_id = asyncHandler(async (req, res) => {
     }
 
     // Fetch products by category_id
-    const products = await Product.find({ category_id });
+    const products = await Product.find({ category_id }).populate("");
 
     // Check if products are found
     if (!products.length) {
@@ -995,7 +995,7 @@ const getCartProducts = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "No items found in cart", status: false });
     }
 
-    // Calculate total amount
+    //Calculate total amount
     let totalAmount = 0;
     cartItems.forEach((item) => {
       totalAmount += item.product_id.price * item.quantity;
@@ -2481,6 +2481,52 @@ const getStudentsPayment = asyncHandler(async (req, res) => {
   }
 });
 
+const updateUserPincode = asyncHandler(async (req, res) => {
+        const { pin_code } = req.body;
+        const user_id = req.headers.userID; // Assuming you have user authentication middleware
+
+        try {
+          // Find the current user to get the old image paths
+          const currentUser = await User.findById(user_id);
+          if (!currentUser) {
+            return res.status(404).json({ message: "User not found" });
+          }
+
+          // Build the update object with optional fields
+          let updateFields = {
+            datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+          };
+
+          // Update optional fields if provided
+          if (pin_code) {
+            updateFields.pin_code = pin_code;
+          }
+          // Update the user's profile fields
+          const updatedUser = await User.findByIdAndUpdate(
+            user_id,
+            {
+              $set: {
+                pin_code: updateFields.pin_code,
+              },
+            },
+            { new: true }
+          );
+
+          if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+          }
+
+          // Return the updated user data
+          return res.status(200).json({
+           user: updatedUser,
+            status: true,
+          });
+        } catch (error) {
+          console.error("Error updating user profile:", error.message);
+          return res.status(500).json({ error: "Internal Server Error" });
+        }
+});
+
 module.exports = {
   getUsers,
   registerUser,
@@ -2530,5 +2576,6 @@ module.exports = {
   getUserOrderInAdmin,
   getAllSupplier,
   getOrderNotifications,
-  getProductsByOrderAndSupplier
+  getProductsByOrderAndSupplier,
+  updateUserPincode
 };

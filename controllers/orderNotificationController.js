@@ -39,7 +39,7 @@ const addNotification = async (userId, order_id, message, totalamount, supplierI
         console.error("Error saving notification:", error.message);
         throw error;
       }
-    };
+};
 
 
 const getTeacherNotifications = asyncHandler(async (req, res) => {

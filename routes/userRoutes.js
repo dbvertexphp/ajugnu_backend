@@ -48,7 +48,8 @@ const {
   getUserOrderInAdmin,
   getAllSupplier,
   getOrderNotifications,
-  getProductsByOrderAndSupplier
+  getProductsByOrderAndSupplier,
+  updateUserPincode,
 
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
@@ -91,6 +92,8 @@ userRoutes.route("/getUserOrderDetails").get(protect, Authorization(["user"]), g
 userRoutes.route("/addRating").post(protect, Authorization(["user"]), addRating);
 userRoutes.route("/getOrderNotifications").get(protect, getOrderNotifications);
 userRoutes.route("/getPopularProduct").get(protect, getPopularProduct);
+userRoutes.route("/updateUserPincode").post(protect, Authorization(["user"]), updateUserPincode);
+
 
 userRoutes.route("/getCoursesByUserId").get(protect, Authorization(["student"]), getCoursesByUserId);
 userRoutes.route("/getAllUsers").get(protect, Authorization(["student", "admin"]), getAllUsers);
@@ -100,10 +103,10 @@ userRoutes.route("/addReview").post(protect, Authorization(["student"]), addRevi
 
 /*------------- Teacher/Admin Both apis --------------------- */
 userRoutes.route("/getTeacherAndCourseByTeacher_IdAndType").post(protect, Authorization(["student", "teacher"]), getTeacherAndCourseByTeacher_IdAndType);
-userRoutes.route("/addBankDetails").post(protect, Authorization(["teacher"]), bank_Detail_create);
-userRoutes.route("/getBankDetails").get(protect, Authorization(["teacher"]), getBankDetails);
-userRoutes.route("/getBankDetailsAdmin/:teacher_id").get(protect, Authorization(["teacher", "admin"]), getBankDetailsAdmin);
-userRoutes.route("/calculatePayment").post(protect, Authorization(["teacher"]), calculatePayment);
+userRoutes.route("/addBankDetails").post(protect, Authorization(["supplier"]), bank_Detail_create);
+userRoutes.route("/getBankDetails").get(protect, Authorization(["supplier"]), getBankDetails);
+userRoutes.route("/getBankDetailsAdmin/:teacher_id").get(protect, Authorization(["supplier", "admin"]), getBankDetailsAdmin);
+userRoutes.route("/calculatePayment").post(protect, Authorization(["supplier"]), calculatePayment);
 
 /*------------- Admin apis --------------------- */
 userRoutes.route("/getAllOrders").get(protect, Authorization(["admin"]), getAllOrders);

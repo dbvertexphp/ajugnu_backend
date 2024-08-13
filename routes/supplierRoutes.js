@@ -17,6 +17,10 @@ const {
   getAllProductsInAdmin,
   updateProductStatus,
   getSupplierOrderNotification,
+  getFertilizerBySupplierId,
+  getToolsBySupplierId,
+  getAllFertilizerProducts,
+  getAllToolsProducts
 
 } = require("../controllers/supplierController.js");
 
@@ -52,6 +56,15 @@ supplierRoutes.put("/updateSupplierProfileData", protect, Authorization(["suppli
 supplierRoutes.get("/getSupplierProfileData", protect, Authorization(["supplier"]), getSupplierProfileData);
 
 supplierRoutes.get("/getSupplierOrderNotification", protect, Authorization(["supplier"]), getSupplierOrderNotification);
+
+supplierRoutes.get("/getFertilizerBySupplierId", protect, Authorization(["supplier", "admin"]), getFertilizerBySupplierId);
+
+supplierRoutes.get("/getToolsBySupplierId", protect, Authorization(["supplier", "admin"]), getToolsBySupplierId);
+
+supplierRoutes.get("/getAllFertilizerProducts", protect, Authorization(["user", "admin"]), getAllFertilizerProducts);
+
+supplierRoutes.get("/getAllToolsProducts", protect, Authorization(["user", "admin"]), getAllToolsProducts);
+
 
 
 module.exports = { supplierRoutes };
