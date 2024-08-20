@@ -20,7 +20,6 @@ const transactionSchema = new Schema(
     },
     payment_status: {
       type: String,
-      required: true,
     },
     status: { type: String, enum: ["order", "confirmed", "shipped", "ontheway", "delivered", "cancelled"], default: "order" },
     total_amount: {

@@ -1212,6 +1212,12 @@ const getOrderNotifications = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "No notifications found", status: false });
     }
 
+    // Mark all unread notifications as read for the supplier
+    await OrderNotification.updateMany(
+      { user_id: userID, userstatus: "unread" },
+      { $set: { userstatus: "read" } }
+    );
+
     res.status(200).json({
       status: true,
       message: "Notifications retrieved successfully",

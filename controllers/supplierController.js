@@ -403,11 +403,22 @@ const getProducts = asyncHandler(async (req, res) => {
           .skip(skip)
           .limit(limit);
 
+          // Fetch count of unread notifications for the supplier
+    const unreadNotificationsCount = await OrderNotification.countDocuments({
+      supplier_ids: { $in: [supplier_id] },
+      supplierstatus: "unread",
+    });
+
+    // Check if there are any unread notifications
+    const notificationStatus = unreadNotificationsCount > 0 ? "unread" : "read";
+
         res.status(200).json({
           products,
           page,
           totalPages: Math.ceil(totalProducts / limit),
           totalProducts,
+          unreadNotificationsCount,
+          notificationStatus,
           status: true,
         });
       } catch (error) {
@@ -415,7 +426,6 @@ const getProducts = asyncHandler(async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
       }
 });
-
 
 const getAllProducts = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
@@ -760,6 +770,15 @@ const getPopularProduct = asyncHandler(async (req, res) => {
       .limit(10) // Limit to top 10 popular products
       .populate("category_id", "_id category_name"); // Populate category data with _id and category_name
 
+      // Fetch count of unread notifications for the supplier
+    const unreadNotificationsCount = await OrderNotification.countDocuments({
+      user_id: userID,
+      userstatus: "unread",
+    });
+
+    // Check if there are any unread notifications
+    const notificationStatus = unreadNotificationsCount > 0 ? "unread" : "read";
+
     if (popularProducts.length === 0) {
       return res.status(404).json({ message: "No popular products found", status: false });
     }
@@ -783,6 +802,8 @@ const getPopularProduct = asyncHandler(async (req, res) => {
       status: true,
       message: "Popular products retrieved successfully",
       products: productsWithFavoriteStatus,
+      unreadNotificationsCount,
+      notificationStatus,
     });
   } catch (error) {
     console.error("Error fetching popular products:", error.message);
@@ -790,28 +811,73 @@ const getPopularProduct = asyncHandler(async (req, res) => {
   }
 });
 
+const getSimilarProducts = asyncHandler(async (req, res) => {
+      const { productId } = req.body; // Assuming product ID is passed as a route parameter
+
+      try {
+        // Fetch the product details based on the provided productId
+        const product = await Product.findById(productId);
+
+        if (!product) {
+          return res.status(404).json({ message: "Product not found", status: false });
+        }
+
+        // Find similar products based on category, product type, and size
+        const similarProducts = await Product.find({
+          _id: { $ne: productId }, // Exclude the original product
+          category_id: product.category_id,
+          product_type: product.product_type,
+          product_size: product.product_size,
+          product_role: product.product_role,
+          active: true,
+        })
+          .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
+          .limit(10) // Limit to top 10 similar products
+          .populate("category_id", "_id category_name"); // Populate category data
+
+        if (similarProducts.length === 0) {
+          return res.status(404).json({ message: "No similar products found", status: false });
+        }
+
+        res.status(200).json({
+          status: true,
+          message: "Similar products retrieved successfully",
+          similarProducts,
+        });
+      } catch (error) {
+        console.error("Error fetching similar products:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+});
+
 const getSupplierOrderNotification = asyncHandler(async (req, res) => {
-  const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
+      const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
 
-  try {
-    if (!supplierId) {
-      return res.status(400).json({ message: "Supplier ID is required", status: false });
-    }
+      try {
+        if (!supplierId) {
+          return res.status(400).json({ message: "Supplier ID is required", status: false });
+        }
 
-    const notifications = await OrderNotification.find({ supplier_ids: supplierId });
+        const notifications = await OrderNotification.find({ supplier_ids: { $in: [supplierId] } });
 
-    if (!notifications || notifications.length === 0) {
-      return res.status(404).json({ message: "No notifications found", status: false });
-    }
+        if (!notifications || notifications.length === 0) {
+          return res.status(404).json({ message: "No notifications found", status: false });
+        }
 
-    res.status(200).json({
-      status: true,
-      notifications: notifications,
-    });
-  } catch (error) {
-    console.error("Error fetching supplier order notifications:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+        // Mark all unread notifications as read for the supplier
+        await OrderNotification.updateMany(
+          { supplier_ids: { $in: [supplierId] }, supplierstatus: "unread" },
+          { $set: { supplierstatus: "read" } }
+        );
+
+        res.status(200).json({
+          status: true,
+          notifications: notifications,
+        });
+      } catch (error) {
+        console.error("Error fetching supplier order notifications:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
 });
 
 const getFertilizerBySupplierId = asyncHandler(async (req, res) => {
@@ -923,5 +989,6 @@ module.exports = {
   getFertilizerBySupplierId,
   getToolsBySupplierId,
   getAllFertilizerProducts,
-  getAllToolsProducts
+  getAllToolsProducts,
+  getSimilarProducts
 };

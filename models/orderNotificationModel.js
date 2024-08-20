@@ -8,6 +8,8 @@ const notificationSchema = new mongoose.Schema({
   type: { type: String },
   totalamount: { type: Number },
   supplier_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  userstatus: { type: String, enum: ["unread", "read"], default: "unread" },
+  supplierstatus: { type: String, enum: ["unread", "read"], default: "unread" },
   created_at: { type: Date, default: Date.now },
 });
 

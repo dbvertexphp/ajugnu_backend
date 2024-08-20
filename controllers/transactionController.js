@@ -12,7 +12,7 @@ const addTransaction = asyncHandler(async (req, res) => {
   console.log(req.body);
 
 
-  if ( !order_id || !payment_status || !total_amount || !payment_method || !status) {
+  if ( !order_id || !total_amount || !payment_method || !status) {
     return res.status(400).json({ message: "Invalid input", status: false });
   }
 
@@ -35,7 +35,7 @@ const addTransaction = asyncHandler(async (req, res) => {
       user_id,
       order_id,
       payment_id : payment_id || null,
-      payment_status,
+      payment_status : payment_status || "pending",
       total_amount,
       payment_method,
       status,

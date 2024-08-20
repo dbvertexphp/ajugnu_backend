@@ -20,7 +20,8 @@ const {
   getFertilizerBySupplierId,
   getToolsBySupplierId,
   getAllFertilizerProducts,
-  getAllToolsProducts
+  getAllToolsProducts,
+  getSimilarProducts
 
 } = require("../controllers/supplierController.js");
 
@@ -64,6 +65,9 @@ supplierRoutes.get("/getToolsBySupplierId", protect, Authorization(["supplier", 
 supplierRoutes.get("/getAllFertilizerProducts", protect, Authorization(["user", "admin"]), getAllFertilizerProducts);
 
 supplierRoutes.get("/getAllToolsProducts", protect, Authorization(["user", "admin"]), getAllToolsProducts);
+
+
+supplierRoutes.post("/getSimilarProducts", protect, Authorization(["user", "admin"]), getSimilarProducts);
 
 
 
