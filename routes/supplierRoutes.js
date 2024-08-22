@@ -58,9 +58,9 @@ supplierRoutes.get("/getSupplierProfileData", protect, Authorization(["supplier"
 
 supplierRoutes.get("/getSupplierOrderNotification", protect, Authorization(["supplier"]), getSupplierOrderNotification);
 
-supplierRoutes.get("/getFertilizerBySupplierId", protect, Authorization(["supplier", "admin"]), getFertilizerBySupplierId);
+supplierRoutes.post("/getFertilizerBySupplierId", protect, getFertilizerBySupplierId);
 
-supplierRoutes.get("/getToolsBySupplierId", protect, Authorization(["supplier", "admin"]), getToolsBySupplierId);
+supplierRoutes.post("/getToolsBySupplierId", protect, getToolsBySupplierId);
 
 supplierRoutes.get("/getAllFertilizerProducts", protect, Authorization(["user", "admin"]), getAllFertilizerProducts);
 

@@ -47,7 +47,7 @@ const addTransaction = asyncHandler(async (req, res) => {
     // Send notifications and add notifications for each supplier
     for (const item of items) {
       const supplier = await User.findById(item.supplier_id);
-      if (supplier && supplier.firebase_token) {
+      if (supplier.firebase_token || user.firebase_token == "dummy_token") {
         const registrationToken = supplier.firebase_token;
         const title = "Product Purchase";
         const body = `A new transaction of ${item.amount} has been made for your products.`;
