@@ -243,12 +243,12 @@ const editProduct = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(err.message, 400));
     }
 
-    const { product_id, english_name, local_name, other_name, category_id, price, quantity, product_type, product_size, description, pin_code } = req.body;
+    const { product_id, english_name, local_name, other_name, category_id, price, quantity, product_type, product_size, description } = req.body;
     const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
     try {
       // Validate required fields
-      if (!product_id || !english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !supplier_id || !pin_code) {
+      if (!product_id || !english_name || !price || !quantity || !product_type || !product_size || !description || !category_id || !supplier_id) {
         return res.status(400).json({
           message: "All fields (product_id, english_name, price, quantity, product_type, product_size, description, category_id, supplier_id, pin_code) are required.",
           status: false,
@@ -266,23 +266,11 @@ const editProduct = asyncHandler(async (req, res, next) => {
         return res.status(403).json({ message: "You do not have permission to edit this product", status: false });
       }
 
-      // Handle pin_code as an array
-      const pinCodesArray = Array.isArray(pin_code) ? pin_code : [pin_code];
-
       // Fetch user data to validate pin codes
       const user = await User.findById(supplier_id);
       if (!user) {
         return res.status(404).json({ message: "User not found", status: false });
       }
-
-      const userPinCodes = user.pin_code || [];
-
-      // Check if provided pin codes exist in the user's pin_code array
-      const invalidPinCodes = pinCodesArray.filter((pin) => !userPinCodes.includes(pin));
-      if (invalidPinCodes.length > 0) {
-        return res.status(400).json({ message: `Invalid pin codes: ${invalidPinCodes.join(", ")}`, status: false });
-      }
-
       // Update product fields
       product.english_name = english_name;
       product.local_name = local_name || product.local_name;
@@ -293,7 +281,6 @@ const editProduct = asyncHandler(async (req, res, next) => {
       product.product_type = product_type;
       product.product_size = product_size;
       product.description = description;
-      product.pin_code = pinCodesArray;
 
       // Remove old product images from the server
       if (req.files && req.files.length > 0) {
@@ -327,7 +314,6 @@ const editProduct = asyncHandler(async (req, res, next) => {
         product_size: updatedProduct.product_size,
         description: updatedProduct.description,
         supplier_id: updatedProduct.supplier_id,
-        pin_code: updatedProduct.pin_code,
         status: true,
       });
     } catch (error) {
@@ -391,13 +377,11 @@ const getProducts = asyncHandler(async (req, res) => {
         const totalProducts = await Product.countDocuments({
           supplier_id,
           product_role: "supplier",
-          active: true,
         });
 
         const products = await Product.find({
           supplier_id,
           product_role: "supplier",
-          active: true,
         })
           .sort({ createdAt: -1 }) // Sort by createdAt in descending order
           .skip(skip)
