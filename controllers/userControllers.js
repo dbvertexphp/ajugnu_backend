@@ -677,7 +677,7 @@ const getAllSupplier = asyncHandler(async (req, res) => {
 // Controller function to get products by category_id
 const getProductByCategory_id = asyncHandler(async (req, res) => {
   const { category_id } = req.body;
-
+  const userID = req.headers.userID;
   try {
     // Validate category_id
     if (!category_id) {
@@ -685,17 +685,32 @@ const getProductByCategory_id = asyncHandler(async (req, res) => {
     }
 
     // Fetch products by category_id
-    const products = await Product.find({ category_id }).populate("");
+    const products = await Product.find({ category_id, active: true }).populate("");
 
     // Check if products are found
     if (!products.length) {
       return res.status(404).json({ message: "No products found for the given category", status: false });
     }
 
+    // For each product, check if it is favorited by the user
+    const productsWithFavoriteStatus = await Promise.all(
+      products.map(async (product) => {
+        const isFavorite = await Favorite.findOne({
+          user_id: userID,
+          product_id: product._id,
+        });
+
+        return {
+          ...product.toObject(),
+          isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
+        };
+      })
+    );
+
     // Return the products
     res.status(200).json({
       status: true,
-      products,
+      products: productsWithFavoriteStatus,
     });
   } catch (error) {
     console.error("Error fetching products by category_id:", error.message);
@@ -724,7 +739,7 @@ const searchProducts = asyncHandler(async (req, res) => {
     // Fetch products matching the search query
     const products = await Product.find({
       $or: [{ english_name: regex }, { local_name: regex }, { other_name: regex }],
-    }).populate('category_id', '_id category_name');
+    }).populate("category_id", "_id category_name");
 
     // Check if products are found
     if (!products.length) {
@@ -953,6 +968,7 @@ const removeFromCart = asyncHandler(async (req, res) => {
 
 const getProductDetailByProductId = asyncHandler(async (req, res) => {
   const { product_id } = req.body;
+  const userID = req.headers.userID;
 
   try {
     // Validate product_id
@@ -967,11 +983,20 @@ const getProductDetailByProductId = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "Product not found", status: false });
     }
 
+    // Check if the product is favorited by the user
+    const isFavorite = await Favorite.findOne({
+      user_id: userID,
+      product_id: product._id,
+    });
+
     // Return success response
     res.status(200).json({
       status: true,
       message: "Product details retrieved successfully",
-      product,
+      product: {
+        ...product.toObject(),
+        isFavorite: !!isFavorite, // true if the product is favorited, false otherwise
+      },
     });
   } catch (error) {
     console.error("Error getting product details:", error.message);
@@ -1213,10 +1238,7 @@ const getOrderNotifications = asyncHandler(async (req, res) => {
     }
 
     // Mark all unread notifications as read for the supplier
-    await OrderNotification.updateMany(
-      { user_id: userID, userstatus: "unread" },
-      { $set: { userstatus: "read" } }
-    );
+    await OrderNotification.updateMany({ user_id: userID, userstatus: "unread" }, { $set: { userstatus: "read" } });
 
     res.status(200).json({
       status: true,
@@ -1297,67 +1319,67 @@ const getAllOrders = asyncHandler(async (req, res) => {
 });
 
 const getProductsByOrderAndSupplier = asyncHandler(async (req, res) => {
-      const { order_id } = req.params;
+  const { order_id } = req.params;
 
-      try {
-        // Validate order_id
-        if (!order_id) {
-          return res.status(400).json({ message: 'Order ID is required', status: false });
-        }
+  try {
+    // Validate order_id
+    if (!order_id) {
+      return res.status(400).json({ message: "Order ID is required", status: false });
+    }
 
-        // Find the order
-        const order = await Order.findById(order_id)
-        .populate("user_id", "full_name email") // Populate user details
-        .populate("items.product_id", "english_name price") // Populate product details
-        .populate("items.supplier_id", "full_name") // Populate user details // Populate supplier details for items
+    // Find the order
+    const order = await Order.findById(order_id)
+      .populate("user_id", "full_name email") // Populate user details
+      .populate("items.product_id", "english_name price") // Populate product details
+      .populate("items.supplier_id", "full_name") // Populate user details // Populate supplier details for items
       .exec();
 
-        if (!order) {
-          return res.status(404).json({ message: 'Order not found', status: false });
-        }
+    if (!order) {
+      return res.status(404).json({ message: "Order not found", status: false });
+    }
 
-        // Get product IDs from the order
-        const productIds = order.items.map(item => item.product_id).filter(id => id); // Filter out null values
+    // Get product IDs from the order
+    const productIds = order.items.map((item) => item.product_id).filter((id) => id); // Filter out null values
 
-        // Fetch product details
-        const products = await Product.find({ _id: { $in: productIds } })
-          .populate('supplier_id', 'full_name') // Populate supplier details if needed
-          .exec();
+    // Fetch product details
+    const products = await Product.find({ _id: { $in: productIds } })
+      .populate("supplier_id", "full_name") // Populate supplier details if needed
+      .exec();
 
-        res.status(200).json({
-          order: {
-            _id: order._id,
-            order_id: order.order_id,
-            shipping_address: order.shipping_address,
-            user_id: {
-              _id: order.user_id._id,
-              full_name: order.user_id.full_name,
-              email: order.user_id.email,
-            },
-            items: order.items.map(item => ({
-              _id: item._id,
-              product_id: item.product_id,
-              quantity: item.quantity,
-              status: item.status,
-              verification_code: item.verification_code,
-              supplier_id: {
-                _id: item.supplier_id._id,
-                full_name: item.supplier_id.full_name
-              }
-            })),
-            payment_method: order.payment_method,
-            total_amount: order.total_amount,
-            created_at: order.created_at,
-            updated_at: order.updated_at,
-            payment_status: order.payment_status,
+    res.status(200).json({
+      order: {
+        _id: order._id,
+        order_id: order.order_id,
+        shipping_address: order.shipping_address,
+        user_id: {
+          _id: order.user_id._id,
+          full_name: order.user_id.full_name,
+          email: order.user_id.email,
+        },
+        items: order.items.map((item) => ({
+          _id: item._id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          status: item.status,
+          verification_code: item.verification_code,
+          supplier_id: {
+            _id: item.supplier_id._id,
+            full_name: item.supplier_id.full_name,
           },
-          products,
-          status: true,
-        });
-      } catch (error) {
-        console.error('Error fetching products by order:', error.message);
-        res.status(500).json({ message: 'Internal Server Error', status: false });
-      }
+        })),
+        payment_method: order.payment_method,
+        total_amount: order.total_amount,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+        payment_status: order.payment_status,
+      },
+      products,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products by order:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
 });
 
 const getUserOrderInAdmin = asyncHandler(async (req, res) => {
@@ -1445,18 +1467,31 @@ const getUserOrderDetails = asyncHandler(async (req, res) => {
     }
 
     // Find all orders for the user
-    const orders = await Order.find({ user_id: userID }).populate({
-      path: "items.product_id",
-      populate: {
-        path: "supplier_id",
-        select: "full_name", // Assuming supplier schema has a field 'full_name'
-      },
-    });
+    const orders = await Order.find({ user_id: userID })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "items.product_id",
+        populate: {
+          path: "supplier_id",
+          select: "full_name", // Assuming supplier schema has a field 'full_name'
+        },
+      });
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ message: "No orders found for this user", status: false });
     }
 
+    // Get all product IDs from the orders
+    const productIds = orders.flatMap((order) => order.items.map((item) => item.product_id._id));
+
+    // Find all ratings for these products by the user
+    const ratings = await Rating.find({ product_id: { $in: productIds }, user_id: userID });
+
+    // Create a map of product IDs to ratings
+    const ratingMap = ratings.reduce((map, rating) => {
+      map[rating.product_id.toString()] = true; // true indicates that the product has been rated
+      return map;
+    }, {});
 
     // Organize order details
     const response = orders.map((order) => {
@@ -1472,6 +1507,9 @@ const getUserOrderDetails = asyncHandler(async (req, res) => {
           };
         }
 
+        const productIdStr = item.product_id._id.toString();
+        const hasRated = ratingMap[productIdStr] || false;
+
         supplierDetails[supplierId].total_amount += item.product_id.price * item.quantity;
         supplierDetails[supplierId].products.push({
           status: item.status,
@@ -1480,6 +1518,7 @@ const getUserOrderDetails = asyncHandler(async (req, res) => {
           price: item.product_id.price,
           product_images: item.product_id.product_images,
           product_name: item.product_id.english_name,
+          has_rated: hasRated,
         });
       });
 
@@ -2489,49 +2528,49 @@ const getStudentsPayment = asyncHandler(async (req, res) => {
 });
 
 const updateUserPincode = asyncHandler(async (req, res) => {
-        const { pin_code } = req.body;
-        const user_id = req.headers.userID; // Assuming you have user authentication middleware
+  const { pin_code } = req.body;
+  const user_id = req.headers.userID; // Assuming you have user authentication middleware
 
-        try {
-          // Find the current user to get the old image paths
-          const currentUser = await User.findById(user_id);
-          if (!currentUser) {
-            return res.status(404).json({ message: "User not found" });
-          }
+  try {
+    // Find the current user to get the old image paths
+    const currentUser = await User.findById(user_id);
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-          // Build the update object with optional fields
-          let updateFields = {
-            datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
-          };
+    // Build the update object with optional fields
+    let updateFields = {
+      datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+    };
 
-          // Update optional fields if provided
-          if (pin_code) {
-            updateFields.pin_code = pin_code;
-          }
-          // Update the user's profile fields
-          const updatedUser = await User.findByIdAndUpdate(
-            user_id,
-            {
-              $set: {
-                pin_code: updateFields.pin_code,
-              },
-            },
-            { new: true }
-          );
+    // Update optional fields if provided
+    if (pin_code) {
+      updateFields.pin_code = pin_code;
+    }
+    // Update the user's profile fields
+    const updatedUser = await User.findByIdAndUpdate(
+      user_id,
+      {
+        $set: {
+          pin_code: updateFields.pin_code,
+        },
+      },
+      { new: true }
+    );
 
-          if (!updatedUser) {
-            return res.status(404).json({ message: "User not found" });
-          }
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-          // Return the updated user data
-          return res.status(200).json({
-           user: updatedUser,
-            status: true,
-          });
-        } catch (error) {
-          console.error("Error updating user profile:", error.message);
-          return res.status(500).json({ error: "Internal Server Error" });
-        }
+    // Return the updated user data
+    return res.status(200).json({
+      user: updatedUser,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error updating user profile:", error.message);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 module.exports = {
@@ -2584,5 +2623,5 @@ module.exports = {
   getAllSupplier,
   getOrderNotifications,
   getProductsByOrderAndSupplier,
-  updateUserPincode
+  updateUserPincode,
 };
