@@ -19,101 +19,100 @@ const Favorite = require("../models/favorite.js");
 dotenv.config();
 
 const updateSupplierProfileData = asyncHandler(async (req, res) => {
-      req.uploadPath = "uploads/profiles";
-      upload.fields([{ name: "profile_pic", maxCount: 1 }])(req, res, async (err) => {
-        if (err) {
-          return res.status(400).json({ error: err.message });
-        }
+  req.uploadPath = "uploads/profiles";
+  upload.fields([{ name: "profile_pic", maxCount: 1 }])(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
 
-        const { full_name, mobile, email, address, pin_code } = req.body;
-        const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
+    const { full_name, mobile, email, address, pin_code } = req.body;
+    const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
 
-        // Get the profile picture path if uploaded
-        const profile_pic = req.files.profile_pic ? `${req.uploadPath}/${req.files.profile_pic[0].filename}` : null;
+    // Get the profile picture path if uploaded
+    const profile_pic = req.files.profile_pic ? `${req.uploadPath}/${req.files.profile_pic[0].filename}` : null;
 
-        try {
-          // Find the current user to get the old image paths and pin codes
-          const currentUser = await User.findById(supplier_id);
-          if (!currentUser) {
-            return res.status(404).json({ message: "User not found" });
-          }
+    try {
+      // Find the current user to get the old image paths and pin codes
+      const currentUser = await User.findById(supplier_id);
+      if (!currentUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-          // Build the update object with optional fields
-          let updateFields = {
-            datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
-          };
+      // Build the update object with optional fields
+      let updateFields = {
+        datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+      };
 
-          // Update optional fields if provided
-          if (full_name) {
-            updateFields.full_name = full_name;
-          }
-          if (mobile) {
-            updateFields.mobile = mobile;
-          }
-          if (email) {
-            updateFields.email = email;
-          }
-          if (address) {
-            updateFields.address = address;
-          }
+      // Update optional fields if provided
+      if (full_name) {
+        updateFields.full_name = full_name;
+      }
+      if (mobile) {
+        updateFields.mobile = mobile;
+      }
+      if (email) {
+        updateFields.email = email;
+      }
+      if (address) {
+        updateFields.address = address;
+      }
 
-          // Check if there is a new profile pic uploaded and delete the old one
-          if (profile_pic && currentUser.profile_pic) {
-            const oldProfilePicPath = currentUser.profile_pic;
-            updateFields.profile_pic = profile_pic;
+      // Check if there is a new profile pic uploaded and delete the old one
+      if (profile_pic && currentUser.profile_pic) {
+        const oldProfilePicPath = currentUser.profile_pic;
+        updateFields.profile_pic = profile_pic;
 
-            // Delete the old profile picture
-            deleteFile(oldProfilePicPath);
-          } else if (profile_pic) {
-            updateFields.profile_pic = profile_pic;
-          }
+        // Delete the old profile picture
+        deleteFile(oldProfilePicPath);
+      } else if (profile_pic) {
+        updateFields.profile_pic = profile_pic;
+      }
 
-          // Handle pin_code as an array and update it
-          let pinCodesArray = [];
-          if (pin_code) {
-            pinCodesArray = Array.isArray(pin_code) ? pin_code : [parseInt(pin_code, 10)];
-            pinCodesArray = [...new Set(pinCodesArray)]; // Remove duplicates
-          }
+      // Handle pin_code as an array and update it
+      let pinCodesArray = [];
+      if (pin_code) {
+        pinCodesArray = Array.isArray(pin_code) ? pin_code : [parseInt(pin_code, 10)];
+        pinCodesArray = [...new Set(pinCodesArray)]; // Remove duplicates
+      }
 
-          // Update the user's profile fields
-          const updatedUser = await User.findByIdAndUpdate(
-            supplier_id,
-            {
-              $set: {
-                full_name: updateFields.full_name,
-                mobile: updateFields.mobile,
-                email: updateFields.email,
-                address: updateFields.address,
-                profile_pic: updateFields.profile_pic,
-                datetime: updateFields.datetime,
-                pin_code: pinCodesArray, // Directly set the new pin codes array
-              },
-            },
-            { new: true }
-          );
+      // Update the user's profile fields
+      const updatedUser = await User.findByIdAndUpdate(
+        supplier_id,
+        {
+          $set: {
+            full_name: updateFields.full_name,
+            mobile: updateFields.mobile,
+            email: updateFields.email,
+            address: updateFields.address,
+            profile_pic: updateFields.profile_pic,
+            datetime: updateFields.datetime,
+            pin_code: pinCodesArray, // Directly set the new pin codes array
+          },
+        },
+        { new: true }
+      );
 
-          if (!updatedUser) {
-            return res.status(404).json({ message: "User not found" });
-          }
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-          // Return the updated user data
-          return res.status(200).json({
-            _id: updatedUser._id,
-            full_name: updatedUser.full_name,
-            mobile: updatedUser.mobile,
-            email: updatedUser.email,
-            address: updatedUser.address,
-            pin_code: updatedUser.pin_code,
-            profile_pic: updatedUser.profile_pic,
-            status: true,
-          });
-        } catch (error) {
-          console.error("Error updating user profile:", error.message);
-          return res.status(500).json({ error: "Internal Server Error" });
-        }
+      // Return the updated user data
+      return res.status(200).json({
+        _id: updatedUser._id,
+        full_name: updatedUser.full_name,
+        mobile: updatedUser.mobile,
+        email: updatedUser.email,
+        address: updatedUser.address,
+        pin_code: updatedUser.pin_code,
+        profile_pic: updatedUser.profile_pic,
+        status: true,
       });
+    } catch (error) {
+      console.error("Error updating user profile:", error.message);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
 });
-
 
 const getSupplierProfileData = asyncHandler(async (req, res) => {
   const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
@@ -325,74 +324,90 @@ const editProduct = asyncHandler(async (req, res, next) => {
 });
 
 const deleteProduct = asyncHandler(async (req, res) => {
-      const { product_id } = req.body; // Product ID is provided in the body
-      const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
+  const { product_id } = req.body; // Product ID is provided in the body
+  const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
 
-      try {
-        // Validate the product_id and supplier_id
-        if (!product_id || !supplier_id) {
-          return res.status(400).json({
-            message: "Product ID and Supplier ID are required.",
-            status: false,
-          });
-        }
+  try {
+    // Validate the product_id and supplier_id
+    if (!product_id || !supplier_id) {
+      return res.status(400).json({
+        message: "Product ID and Supplier ID are required.",
+        status: false,
+      });
+    }
 
-        // Find the product to be deactivated
-        const product = await Product.findById(product_id);
-        if (!product) {
-          return res.status(404).json({ message: "Product not found", status: false });
-        }
+    // Find the product to be deactivated
+    const product = await Product.findById(product_id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
 
-        // Check if the supplier_id matches
-        if (product.supplier_id.toString() !== supplier_id) {
-          return res.status(403).json({ message: "You do not have permission to deactivate this product", status: false });
-        }
+    // Check if the supplier_id matches
+    if (product.supplier_id.toString() !== supplier_id) {
+      return res.status(403).json({ message: "You do not have permission to deactivate this product", status: false });
+    }
 
-        // Update the product to set active to false
-        await Product.findByIdAndUpdate(
-          product_id,
-          { $set: { active: false } },
-          { new: true } // Return the updated document
-        );
+    // Update the product to set active to false
+    await Product.findByIdAndUpdate(
+      product_id,
+      { $set: { active: false } },
+      { new: true } // Return the updated document
+    );
 
-        res.status(200).json({
-          message: "Product deactivated successfully.",
-          status: true,
-        });
-      } catch (error) {
-        console.error("Error deactivating product:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+    // Send notification to the supplier
+    const supplier = await User.findById(supplier_id);
+    if (supplier.firebase_token || supplier.firebase_token == "dummy_token") {
+      const registrationToken = supplier.firebase_token;
+      const title = "Product Deactivated";
+      const body = `Your product "${product.english_name}" has been deactivated.`;
+
+      const notificationResult = await sendFCMNotification(registrationToken, title, body);
+      if (notificationResult.success) {
+        console.log("Notification sent successfully:", notificationResult.response);
+      } else {
+        console.error("Failed to send notification:", notificationResult.error);
       }
+      // Optionally, log or handle notification results
+    }
+
+    res.status(200).json({
+      message: "Product deactivated successfully.",
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error deactivating product:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getProducts = asyncHandler(async (req, res) => {
-      const supplier_id = req.headers.userID; // Extracting supplier_id from headers
-      const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
-      const limit = 10; // Number of products per page
+  const supplier_id = req.headers.userID; // Extracting supplier_id from headers
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const limit = 10; // Number of products per page
 
-      try {
-        if (!supplier_id) {
-          return res.status(400).json({
-            message: "Supplier ID is required.",
-            status: false,
-          });
-        }
+  try {
+    if (!supplier_id) {
+      return res.status(400).json({
+        message: "Supplier ID is required.",
+        status: false,
+      });
+    }
 
-        const skip = (page - 1) * limit;
-        const totalProducts = await Product.countDocuments({
-          supplier_id,
-          product_role: "supplier",
-        });
+    const skip = (page - 1) * limit;
+    const totalProducts = await Product.countDocuments({
+      supplier_id,
+      product_role: "supplier",
+    });
 
-        const products = await Product.find({
-          supplier_id,
-          product_role: "supplier",
-        })
-          .sort({ createdAt: -1 }) // Sort by createdAt in descending order
-          .skip(skip)
-          .limit(limit);
+    const products = await Product.find({
+      supplier_id,
+      product_role: "supplier",
+    })
+      .sort({ createdAt: -1 }) // Sort by createdAt in descending order
+      .skip(skip)
+      .limit(limit);
 
-          // Fetch count of unread notifications for the supplier
+    // Fetch count of unread notifications for the supplier
     const unreadNotificationsCount = await OrderNotification.countDocuments({
       supplier_ids: { $in: [supplier_id] },
       supplierstatus: "unread",
@@ -401,19 +416,19 @@ const getProducts = asyncHandler(async (req, res) => {
     // Check if there are any unread notifications
     const notificationStatus = unreadNotificationsCount > 0 ? "unread" : "read";
 
-        res.status(200).json({
-          products,
-          page,
-          totalPages: Math.ceil(totalProducts / limit),
-          totalProducts,
-          unreadNotificationsCount,
-          notificationStatus,
-          status: true,
-        });
-      } catch (error) {
-        console.error("Error fetching products:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+    res.status(200).json({
+      products,
+      page,
+      totalPages: Math.ceil(totalProducts / limit),
+      totalProducts,
+      unreadNotificationsCount,
+      notificationStatus,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getAllProducts = asyncHandler(async (req, res) => {
@@ -759,7 +774,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
       .limit(10) // Limit to top 10 popular products
       .populate("category_id", "_id category_name"); // Populate category data with _id and category_name
 
-      // Fetch count of unread notifications for the supplier
+    // Fetch count of unread notifications for the supplier
     const unreadNotificationsCount = await OrderNotification.countDocuments({
       user_id: userID,
       userstatus: "unread",
@@ -801,162 +816,158 @@ const getPopularProduct = asyncHandler(async (req, res) => {
 });
 
 const getSimilarProducts = asyncHandler(async (req, res) => {
-      const { productId } = req.body; // Assuming product ID is passed as a route parameter
+  const { productId } = req.body; // Assuming product ID is passed as a route parameter
 
-      try {
-        // Fetch the product details based on the provided productId
-        const product = await Product.findById(productId);
+  try {
+    // Fetch the product details based on the provided productId
+    const product = await Product.findById(productId);
 
-        if (!product) {
-          return res.status(404).json({ message: "Product not found", status: false });
-        }
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
 
-        // Find similar products based on category, product type, and size
-        const similarProducts = await Product.find({
-          _id: { $ne: productId }, // Exclude the original product
-          category_id: product.category_id,
-          product_type: product.product_type,
-          product_size: product.product_size,
-          product_role: product.product_role,
-          active: true,
-        })
-          .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
-          .limit(10) // Limit to top 10 similar products
-          .populate("category_id", "_id category_name"); // Populate category data
+    // Find similar products based on category, product type, and size
+    const similarProducts = await Product.find({
+      _id: { $ne: productId }, // Exclude the original product
+      category_id: product.category_id,
+      product_type: product.product_type,
+      product_size: product.product_size,
+      product_role: product.product_role,
+      active: true,
+    })
+      .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
+      .limit(10) // Limit to top 10 similar products
+      .populate("category_id", "_id category_name"); // Populate category data
 
-        if (similarProducts.length === 0) {
-          return res.status(404).json({ message: "No similar products found", status: false });
-        }
+    if (similarProducts.length === 0) {
+      return res.status(404).json({ message: "No similar products found", status: false });
+    }
 
-        res.status(200).json({
-          status: true,
-          message: "Similar products retrieved successfully",
-          similarProducts,
-        });
-      } catch (error) {
-        console.error("Error fetching similar products:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+    res.status(200).json({
+      status: true,
+      message: "Similar products retrieved successfully",
+      similarProducts,
+    });
+  } catch (error) {
+    console.error("Error fetching similar products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getSupplierOrderNotification = asyncHandler(async (req, res) => {
-      const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
+  const supplierId = req.headers.userID; // Assuming supplier_id is passed via headers
 
-      try {
-        if (!supplierId) {
-          return res.status(400).json({ message: "Supplier ID is required", status: false });
-        }
+  try {
+    if (!supplierId) {
+      return res.status(400).json({ message: "Supplier ID is required", status: false });
+    }
 
-        const notifications = await OrderNotification.find({ supplier_ids: { $in: [supplierId] } });
+    const notifications = await OrderNotification.find({ supplier_ids: { $in: [supplierId] } });
 
-        if (!notifications || notifications.length === 0) {
-          return res.status(404).json({ message: "No notifications found", status: false });
-        }
+    if (!notifications || notifications.length === 0) {
+      return res.status(404).json({ message: "No notifications found", status: false });
+    }
 
-        // Mark all unread notifications as read for the supplier
-        await OrderNotification.updateMany(
-          { supplier_ids: { $in: [supplierId] }, supplierstatus: "unread" },
-          { $set: { supplierstatus: "read" } }
-        );
+    // Mark all unread notifications as read for the supplier
+    await OrderNotification.updateMany({ supplier_ids: { $in: [supplierId] }, supplierstatus: "unread" }, { $set: { supplierstatus: "read" } });
 
-        res.status(200).json({
-          status: true,
-          notifications: notifications,
-        });
-      } catch (error) {
-        console.error("Error fetching supplier order notifications:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+    res.status(200).json({
+      status: true,
+      notifications: notifications,
+    });
+  } catch (error) {
+    console.error("Error fetching supplier order notifications:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getFertilizerBySupplierId = asyncHandler(async (req, res) => {
-      const {supplier_id} = req.body; // Extracting supplier_id from headers
+  const { supplier_id } = req.body; // Extracting supplier_id from headers
 
-      try {
-        if (!supplier_id) {
-          return res.status(400).json({
-            message: "Supplier ID is required.",
-            status: false,
-          });
-        }
+  try {
+    if (!supplier_id) {
+      return res.status(400).json({
+        message: "Supplier ID is required.",
+        status: false,
+      });
+    }
 
-        const products = await Product.find({ supplier_id, product_role: "fertilizer" });
+    const products = await Product.find({ supplier_id, product_role: "fertilizer" });
 
-        res.status(200).json({
-          products,
-          totalProducts: products.length,
-          status: true,
-        });
-      } catch (error) {
-        console.error("Error fetching products:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+    res.status(200).json({
+      products,
+      totalProducts: products.length,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getToolsBySupplierId = asyncHandler(async (req, res) => {
-      const {supplier_id} = req.body; // Extracting supplier_id from headers
+  const { supplier_id } = req.body; // Extracting supplier_id from headers
 
-      try {
-        if (!supplier_id) {
-          return res.status(400).json({
-            message: "Supplier ID is required.",
-            status: false,
-          });
-        }
+  try {
+    if (!supplier_id) {
+      return res.status(400).json({
+        message: "Supplier ID is required.",
+        status: false,
+      });
+    }
 
-        const products = await Product.find({ supplier_id, product_role: "tools" });
+    const products = await Product.find({ supplier_id, product_role: "tools" });
 
-        res.status(200).json({
-          products,
-          totalProducts: products.length,
-          status: true,
-        });
-      } catch (error) {
-        console.error("Error fetching products:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+    res.status(200).json({
+      products,
+      totalProducts: products.length,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const getAllFertilizerProducts = asyncHandler(async (req, res) => {
-      try {
-        const query = {
-          $and: [
-            { product_role: "fertilizer" }, // Add the condition for product_role
-          ],
-        };
+  try {
+    const query = {
+      $and: [
+        { product_role: "fertilizer" }, // Add the condition for product_role
+      ],
+    };
 
-        const fertilizer = await Product.find(query)
+    const fertilizer = await Product.find(query);
 
-        res.status(200).json({
-          fertilizer,
-          status: true,
-        });
-      } catch (error) {
-        console.error("Error fetching fertilizer:", error.message);
-        res.status(500).json({ message: "Internal Server Error", status: false });
-      }
+    res.status(200).json({
+      fertilizer,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching fertilizer:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
 });
 
 const getAllToolsProducts = asyncHandler(async (req, res) => {
-      try {
-        const query = {
-          $and: [
-            { product_role: "tools" }, // Add the condition for product_role
-          ],
-        };
+  try {
+    const query = {
+      $and: [
+        { product_role: "tools" }, // Add the condition for product_role
+      ],
+    };
 
-        const tools = await Product.find(query)
+    const tools = await Product.find(query);
 
-        res.status(200).json({
-            tools,
-          status: true,
-        });
-      } catch (error) {
-        console.error("Error fetching fertilizer:", error.message);
-        res.status(500).json({ message: "Internal Server Error", status: false });
-      }
+    res.status(200).json({
+      tools,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching fertilizer:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
 });
-
 
 module.exports = {
   updateSupplierProfileData,
@@ -979,5 +990,5 @@ module.exports = {
   getToolsBySupplierId,
   getAllFertilizerProducts,
   getAllToolsProducts,
-  getSimilarProducts
+  getSimilarProducts,
 };

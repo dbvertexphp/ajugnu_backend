@@ -739,6 +739,7 @@ const searchProducts = asyncHandler(async (req, res) => {
     // Fetch products matching the search query
     const products = await Product.find({
       $or: [{ english_name: regex }, { local_name: regex }, { other_name: regex }],
+      active: true,
     }).populate("category_id", "_id category_name");
 
     // Check if products are found
@@ -1203,6 +1204,26 @@ const checkout = asyncHandler(async (req, res) => {
       // Pass supplier IDs as an array to the addNotification function
       await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, Array.from(supplierIds), title, "order");
     }
+
+    // Send notification to each supplier
+    const supplierArray = Array.from(supplierIds);
+    const suppliers = await User.find({ _id: { $in: supplierArray } });
+
+    for (const supplier of suppliers) {
+      if (supplier.firebase_token || supplier.firebase_token == "dummy_token") {
+        const supplierToken = supplier.firebase_token;
+        const supplierTitle = "Product Sold";
+        const supplierBody = `A product has been purchased from your inventory!`;
+
+        const supplierNotificationResult = await sendFCMNotification(supplierToken, supplierTitle, supplierBody);
+        if (supplierNotificationResult.success) {
+          console.log("Notification sent successfully to supplier:", supplierNotificationResult.response);
+        } else {
+          console.error("Failed to send notification to supplier:", supplierNotificationResult.error);
+        }
+      }
+    }
+    await addNotification(savedOrder.user_id, savedOrder._id, supplierBody, savedOrder.total_amount, null, supplierTitle, "order");
 
     // Update product stock and clear user's cart (as before)
     for (const item of cartItems) {
