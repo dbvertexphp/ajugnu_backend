@@ -1202,7 +1202,7 @@ const checkout = asyncHandler(async (req, res) => {
       }
 
       // Pass supplier IDs as an array to the addNotification function
-      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, Array.from(supplierIds), title, "order");
+      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount,null, title, "order");
     }
 
     // Send notification to each supplier
@@ -1221,9 +1221,10 @@ const checkout = asyncHandler(async (req, res) => {
         } else {
           console.error("Failed to send notification to supplier:", supplierNotificationResult.error);
         }
+        await addNotification(savedOrder.user_id, savedOrder._id, supplierBody, savedOrder.total_amount, Array.from(supplierIds), supplierTitle, "order");
       }
     }
-    await addNotification(savedOrder.user_id, savedOrder._id, supplierBody, savedOrder.total_amount, null, supplierTitle, "order");
+
 
     // Update product stock and clear user's cart (as before)
     for (const item of cartItems) {
