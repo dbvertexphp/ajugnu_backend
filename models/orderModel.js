@@ -17,6 +17,7 @@ const orderSchema = new mongoose.Schema({
     address: { type: String, required: true },
     pincode: { type: String, required: true },
     mobile_number: { type: String, required: true },
+    remark: { type: String },
   },
   payment_method: { type: String, enum: ["online", "cod"], required: true },
   total_amount: { type: Number, required: true },

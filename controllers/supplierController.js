@@ -586,13 +586,15 @@ const getOrdersBySupplierId = asyncHandler(async (req, res) => {
     }
 
     // Find all orders for the supplier
-    const orders = await Order.find({ "items.supplier_id": supplier_id }).populate({
-      path: "items.product_id",
-      populate: {
-        path: "supplier_id",
-        select: "full_name", // Assuming supplier schema has a field 'full_name'
-      },
-    });
+    const orders = await Order.find({ "items.supplier_id": supplier_id })
+      .sort({ created_at: -1 })
+      .populate({
+        path: "items.product_id",
+        populate: {
+          path: "supplier_id",
+          select: "full_name", // Assuming supplier schema has a field 'full_name'
+        },
+      });
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ message: "No orders found for this supplier", status: false });

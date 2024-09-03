@@ -859,7 +859,7 @@ const getFavoriteProduct = asyncHandler(async (req, res) => {
     }
 
     // Find all favorite products for the user
-    const favorites = await Favorite.find({ user_id: userID }).populate("product_id");
+    const favorites = await Favorite.find({ user_id: userID }).sort({ createdAt: -1 }).populate("product_id");
 
     if (!favorites.length) {
       return res.status(404).json({ message: "No favorite products found", status: false });
@@ -1202,7 +1202,7 @@ const checkout = asyncHandler(async (req, res) => {
       }
 
       // Pass supplier IDs as an array to the addNotification function
-      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount,null, title, "order");
+      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, null, title, "order");
     }
 
     // Send notification to each supplier
@@ -1224,7 +1224,6 @@ const checkout = asyncHandler(async (req, res) => {
         await addNotification(savedOrder.user_id, savedOrder._id, supplierBody, savedOrder.total_amount, Array.from(supplierIds), supplierTitle, "order");
       }
     }
-
 
     // Update product stock and clear user's cart (as before)
     for (const item of cartItems) {
@@ -1490,7 +1489,7 @@ const getUserOrderDetails = asyncHandler(async (req, res) => {
 
     // Find all orders for the user
     const orders = await Order.find({ user_id: userID })
-      .sort({ createdAt: -1 })
+      .sort({ created_at: -1 })
       .populate({
         path: "items.product_id",
         populate: {
@@ -1549,8 +1548,8 @@ const getUserOrderDetails = asyncHandler(async (req, res) => {
         order_id: order.order_id,
         order_status: order.status,
         payment_method: order.payment_method,
-        created_at: order.createdAt,
-        updated_at: order.updatedAt,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
         details: Object.keys(supplierDetails).map((supplierId) => ({
           supplier_id: supplierId,
           full_name: supplierDetails[supplierId].full_name,
@@ -1653,10 +1652,20 @@ const getBankDetailsAdmin = asyncHandler(async (req, res) => {
 
 const getAllUsers = asyncHandler(async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, search = "" } = req.query;
     const skip = (page - 1) * limit;
+    const searchRegex = new RegExp(search, "i");
 
-    const users = await User.find({ role: "user" }).skip(skip).limit(Number(limit));
+    const users = await User.find({
+      role: "user",
+      $or: [
+        { name: searchRegex }, // Assuming you want to search by name
+        { email: searchRegex }, // Assuming you want to search by email
+        // Add other fields as needed
+      ],
+    })
+      .skip(skip)
+      .limit(Number(limit));
     const totalUsers = await User.countDocuments({ role: "user" });
 
     const transformedUsersPromises = users.map(async (user) => {
@@ -1694,21 +1703,24 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Search keyword from query params
+    // Get the search keyword from query params
     const searchKeyword = req.query.search || "";
 
+    // Construct the query to search by full_name and filter by role 'supplier'
     const query = {
       role: "supplier",
-      $or: [{ full_name: { $regex: searchKeyword, $options: "i" } }],
+      full_name: { $regex: searchKeyword, $options: "i" }, // Case-insensitive search
     };
 
+    // Fetch suppliers based on the query, skip, and limit
     const suppliers = await User.find(query).skip(skip).limit(limit);
 
+    // Get the total number of suppliers that match the query
     const totalSuppliers = await User.countDocuments(query);
 
+    // Return the results along with pagination details
     res.json({
       Suppliers: suppliers,
-
       total_rows: totalSuppliers,
       current_page: page,
       total_pages: Math.ceil(totalSuppliers / limit),
@@ -2595,6 +2607,42 @@ const updateUserPincode = asyncHandler(async (req, res) => {
   }
 });
 
+const getProductsRendom = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const limit = parseInt(req.query.limit) || 4; // Number of products per page, default to 10
+  const search = req.query.search || ""; // Search term
+  const sortBy = req.query.sortBy || "createdAt"; // Field to sort by, default to 'createdAt'
+  const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
+
+  try {
+    const query = {
+      $and: [
+        { product_role: "supplier" },
+        {
+          $or: [{ english_name: { $regex: search, $options: "i" } }],
+        },
+      ],
+    };
+
+    const totalProducts = await Product.countDocuments(query);
+    const products = await Product.find(query)
+      .sort({ [sortBy]: order })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.status(200).json({
+      products,
+      page,
+      totalPages: Math.ceil(totalProducts / limit),
+      totalProducts,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
+});
+
 module.exports = {
   getUsers,
   registerUser,
@@ -2646,4 +2694,5 @@ module.exports = {
   getOrderNotifications,
   getProductsByOrderAndSupplier,
   updateUserPincode,
+  getProductsRendom,
 };
