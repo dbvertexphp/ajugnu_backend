@@ -679,13 +679,28 @@ const getProductByCategory_id = asyncHandler(async (req, res) => {
   const { category_id } = req.body;
   const userID = req.headers.userID;
   try {
+    // Fetch the user data to get their pin code
+    const user = await User.findById(userID);
+    if (!user) {
+      return res.status(404).json({ message: "User not found", status: false });
+    }
+
+    const userPinCode = user.pin_code;
     // Validate category_id
     if (!category_id) {
       return res.status(400).json({ message: "Category ID is required", status: false });
     }
 
+    // Find all suppliers whose pin codes match the user's pin code
+    const matchingSuppliers = await User.find({
+      role: "supplier",
+      pin_code: { $in: userPinCode },
+    }).select("_id");
+
+    const supplierIds = matchingSuppliers.map((supplier) => supplier._id);
+
     // Fetch products by category_id
-    const products = await Product.find({ category_id, active: true }).populate("");
+    const products = await Product.find({ category_id, active: true, supplier_id: { $in: supplierIds } }).populate("");
 
     // Check if products are found
     if (!products.length) {

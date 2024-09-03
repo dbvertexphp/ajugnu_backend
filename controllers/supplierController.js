@@ -15,6 +15,8 @@ const { addNotification } = require("./orderNotificationController");
 const { sendFCMNotification } = require("./notificationControllers");
 const OrderNotification = require("../models/orderNotificationModel.js");
 const Favorite = require("../models/favorite.js");
+const Cart = require("../models/cartModel.js");
+
 
 dotenv.config();
 
@@ -785,6 +787,10 @@ const getPopularProduct = asyncHandler(async (req, res) => {
     // Check if there are any unread notifications
     const notificationStatus = unreadNotificationsCount > 0 ? "unread" : "read";
 
+    // Fetch cart items to get the count of products in the cart
+    const cartItems = await Cart.find({ user_id: userID });
+    const cartProductCount = cartItems.length;
+
     if (popularProducts.length === 0) {
       return res.status(404).json({ message: "No popular products found", status: false });
     }
@@ -810,6 +816,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
       products: productsWithFavoriteStatus,
       unreadNotificationsCount,
       notificationStatus,
+      cartProductCount
     });
   } catch (error) {
     console.error("Error fetching popular products:", error.message);
@@ -864,7 +871,7 @@ const getSupplierOrderNotification = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Supplier ID is required", status: false });
     }
 
-    const notifications = await OrderNotification.find({ supplier_ids: { $in: [supplierId] } });
+    const notifications = await OrderNotification.find({ supplier_ids: { $in: [supplierId] } }).sort({ created_at: -1 });
 
     if (!notifications || notifications.length === 0) {
       return res.status(404).json({ message: "No notifications found", status: false });
