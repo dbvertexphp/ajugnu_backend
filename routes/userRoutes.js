@@ -75,11 +75,11 @@ userRoutes.route("/getAllSupplier").get(protect, getAllSupplier);
 
 /*------------- User/Admin Both apis --------------------- */
 
-userRoutes.route("/updateCostomerProfileData").post(protect, Authorization(["user"]), updateCostomerProfileData);
-userRoutes.route("/getProductByCategory_id").post(protect, Authorization(["user"]), getProductByCategory_id);
-userRoutes.route("/searchProducts").post(protect, Authorization(["user"]), searchProducts);
-userRoutes.route("/addFavoriteProduct").post(protect, Authorization(["user"]), addFavoriteProduct);
-userRoutes.route("/removeFavoriteProduct").post(protect, Authorization(["user"]), removeFavoriteProduct);
+userRoutes.route("/updateCostomerProfileData").post(protect, Authorization(["user","both"]), updateCostomerProfileData);
+userRoutes.route("/getProductByCategory_id").post(protect, Authorization(["user","both"]), getProductByCategory_id);
+userRoutes.route("/searchProducts").post(protect, Authorization(["user","both"]), searchProducts);
+userRoutes.route("/addFavoriteProduct").post(protect, Authorization(["user","both"]), addFavoriteProduct);
+userRoutes.route("/removeFavoriteProduct").post(protect, Authorization(["user","both"]), removeFavoriteProduct);
 userRoutes.route("/addToCart").post(protect, Authorization(["user"]), addToCart);
 userRoutes.route("/getFavoriteProduct").get(protect, Authorization(["user"]), getFavoriteProduct);
 userRoutes.route("/getProductDetailByProductId").post(protect, Authorization(["user"]), getProductDetailByProductId);
@@ -91,7 +91,7 @@ userRoutes.route("/removeFromCart").post(protect, Authorization(["user"]), remov
 userRoutes.route("/getUserOrderDetails").get(protect, Authorization(["user"]), getUserOrderDetails);
 userRoutes.route("/addRating").post(protect, Authorization(["user"]), addRating);
 userRoutes.route("/getOrderNotifications").get(protect, getOrderNotifications);
-userRoutes.route("/getPopularProduct").get(protect, getPopularProduct);
+userRoutes.route("/getPopularProduct").get(protect, Authorization(["user","both"]), getPopularProduct);
 userRoutes.route("/updateUserPincode").post(protect, Authorization(["user"]), updateUserPincode);
 userRoutes.route("/getProductsRendom").get(protect, Authorization(["user"]), getProductsRendom);
 
@@ -103,10 +103,10 @@ userRoutes.route("/addReview").post(protect, Authorization(["student"]), addRevi
 
 /*------------- Teacher/Admin Both apis --------------------- */
 userRoutes.route("/getTeacherAndCourseByTeacher_IdAndType").post(protect, Authorization(["student", "teacher"]), getTeacherAndCourseByTeacher_IdAndType);
-userRoutes.route("/addBankDetails").post(protect, Authorization(["supplier"]), bank_Detail_create);
-userRoutes.route("/getBankDetails").get(protect, Authorization(["supplier"]), getBankDetails);
-userRoutes.route("/getBankDetailsAdmin/:teacher_id").get(protect, Authorization(["supplier", "admin"]), getBankDetailsAdmin);
-userRoutes.route("/calculatePayment").post(protect, Authorization(["supplier"]), calculatePayment);
+userRoutes.route("/addBankDetails").post(protect, Authorization(["supplier","both"]), bank_Detail_create);
+userRoutes.route("/getBankDetails").get(protect, Authorization(["supplier","both"]), getBankDetails);
+userRoutes.route("/getBankDetailsAdmin/:teacher_id").get(protect, Authorization(["supplier","both", "admin"]), getBankDetailsAdmin);
+userRoutes.route("/calculatePayment").post(protect, Authorization(["supplier","both"]), calculatePayment);
 
 /*------------- Admin apis --------------------- */
 userRoutes.route("/getAllOrders").get(protect, Authorization(["admin"]), getAllOrders);
