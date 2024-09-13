@@ -21,7 +21,8 @@ const {
   getToolsBySupplierId,
   getAllFertilizerProducts,
   getAllToolsProducts,
-  getSimilarProducts
+  getSimilarProducts,
+  updateProductDefaultStatus
 
 } = require("../controllers/supplierController.js");
 
@@ -31,6 +32,8 @@ const supplierRoutes = express.Router();
 supplierRoutes.post("/addProduct", protect, Authorization(["supplier", "admin","both"]), addProduct);
 
 supplierRoutes.post("/updateProductStatus", protect, Authorization(["admin"]), updateProductStatus);
+
+supplierRoutes.post("/updateProductDefaultStatus", protect, Authorization(["admin"]), updateProductDefaultStatus);
 
 supplierRoutes.post("/editProduct", protect, Authorization(["supplier", "admin","both"]), editProduct);
 

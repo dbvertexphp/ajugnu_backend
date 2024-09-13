@@ -62,6 +62,10 @@ const productSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    default_product:{
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

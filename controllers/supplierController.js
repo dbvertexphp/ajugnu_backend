@@ -210,32 +210,73 @@ const addProduct = asyncHandler(async (req, res, next) => {
   });
 });
 
+const updateProductDefaultStatus = asyncHandler(async (req, res) => {
+      const { productId, default_product } = req.body;
+
+      if (typeof default_product !== "boolean") {
+        return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
+      }
+
+      try {
+        const product = await Product.findById(productId);
+
+        if (!product) {
+          return res.status(404).json({ message: "Product not found", status: false });
+        }
+
+        // Check if the request is trying to set default_product to true
+        if (default_product) {
+          // Count how many products already have default_product set to true
+          const defaultProductsCount = await Product.countDocuments({ default_product: true });
+
+          if (defaultProductsCount >= 4) {
+            return res.status(400).json({
+              message: "Cannot set default_product to true for more than 4 products.",
+              status: false,
+            });
+          }
+        }
+
+        product.default_product = default_product;
+        const updatedProduct = await product.save();
+
+        res.status(200).json({
+          _id: updatedProduct._id,
+          default_product: updatedProduct.default_product,
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error updating product status:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+});
+
 const updateProductStatus = asyncHandler(async (req, res) => {
-  const { productId, active } = req.body; // Get the product ID from the URL parameters
+      const { productId, active } = req.body; // Get the product ID from the URL parameters
 
-  if (typeof active !== "boolean") {
-    return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
-  }
+      if (typeof active !== "boolean") {
+        return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
+      }
 
-  try {
-    const product = await Product.findById(productId);
+      try {
+        const product = await Product.findById(productId);
 
-    if (!product) {
-      return res.status(404).json({ message: "Product not found", status: false });
-    }
+        if (!product) {
+          return res.status(404).json({ message: "Product not found", status: false });
+        }
 
-    product.active = active;
-    const updatedProduct = await product.save();
+        product.active = active;
+        const updatedProduct = await product.save();
 
-    res.status(200).json({
-      _id: updatedProduct._id,
-      active: updatedProduct.active,
-      status: true,
-    });
-  } catch (error) {
-    console.error("Error updating product status:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+        res.status(200).json({
+          _id: updatedProduct._id,
+          active: updatedProduct.active,
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error updating product status:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
 });
 
 const editProduct = asyncHandler(async (req, res, next) => {
@@ -1000,4 +1041,5 @@ module.exports = {
   getAllFertilizerProducts,
   getAllToolsProducts,
   getSimilarProducts,
+  updateProductDefaultStatus,
 };

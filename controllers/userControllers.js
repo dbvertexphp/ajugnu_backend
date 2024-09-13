@@ -2633,6 +2633,8 @@ const getProductsRendom = asyncHandler(async (req, res) => {
     const query = {
       $and: [
         { product_role: "supplier" },
+        {active: true},
+        {default_product: true},
         {
           $or: [{ english_name: { $regex: search, $options: "i" } }],
         },
