@@ -2656,7 +2656,7 @@ const getProductsRendom = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching products:", error.message);
-    res.status(500).json({ message: "Internal Server Error", status: false });
+    res.status(500).json({ message: "Internal Server Error", status: false })
   }
 });
 
