@@ -2645,7 +2645,11 @@ const getProductsRendom = asyncHandler(async (req, res) => {
     const products = await Product.find(query)
       .sort({ [sortBy]: order })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .populate({
+        path: "supplier_id", // Path to populate
+        select: "pin_code", // Only fetch the pin_code array from users collection
+      });
 
     res.status(200).json({
       products,
