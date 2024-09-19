@@ -16,7 +16,7 @@ const { sendFCMNotification } = require("./notificationControllers");
 const OrderNotification = require("../models/orderNotificationModel.js");
 const Favorite = require("../models/favorite.js");
 const Cart = require("../models/cartModel.js");
-
+const ProductType = require("../models/product_type_Model.js");
 
 dotenv.config();
 
@@ -211,72 +211,72 @@ const addProduct = asyncHandler(async (req, res, next) => {
 });
 
 const updateProductDefaultStatus = asyncHandler(async (req, res) => {
-      const { productId, default_product } = req.body;
+  const { productId, default_product } = req.body;
 
-      if (typeof default_product !== "boolean") {
-        return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
-      }
+  if (typeof default_product !== "boolean") {
+    return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
+  }
 
-      try {
-        const product = await Product.findById(productId);
+  try {
+    const product = await Product.findById(productId);
 
-        if (!product) {
-          return res.status(404).json({ message: "Product not found", status: false });
-        }
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
 
-        // Check if the request is trying to set default_product to true
-        if (default_product) {
-          // Count how many products already have default_product set to true
-          const defaultProductsCount = await Product.countDocuments({ default_product: true });
+    // Check if the request is trying to set default_product to true
+    if (default_product) {
+      // Count how many products already have default_product set to true
+      const defaultProductsCount = await Product.countDocuments({ default_product: true });
 
-          if (defaultProductsCount >= 4) {
-            return res.status(400).json({
-              message: "Cannot set default_product to true for more than 4 products.",
-              status: false,
-            });
-          }
-        }
-
-        product.default_product = default_product;
-        const updatedProduct = await product.save();
-
-        res.status(200).json({
-          _id: updatedProduct._id,
-          default_product: updatedProduct.default_product,
-          status: true,
+      if (defaultProductsCount >= 4) {
+        return res.status(400).json({
+          message: "Cannot set default_product to true for more than 4 products.",
+          status: false,
         });
-      } catch (error) {
-        console.error("Error updating product status:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
       }
+    }
+
+    product.default_product = default_product;
+    const updatedProduct = await product.save();
+
+    res.status(200).json({
+      _id: updatedProduct._id,
+      default_product: updatedProduct.default_product,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error updating product status:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const updateProductStatus = asyncHandler(async (req, res) => {
-      const { productId, active } = req.body; // Get the product ID from the URL parameters
+  const { productId, active } = req.body; // Get the product ID from the URL parameters
 
-      if (typeof active !== "boolean") {
-        return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
-      }
+  if (typeof active !== "boolean") {
+    return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
+  }
 
-      try {
-        const product = await Product.findById(productId);
+  try {
+    const product = await Product.findById(productId);
 
-        if (!product) {
-          return res.status(404).json({ message: "Product not found", status: false });
-        }
+    if (!product) {
+      return res.status(404).json({ message: "Product not found", status: false });
+    }
 
-        product.active = active;
-        const updatedProduct = await product.save();
+    product.active = active;
+    const updatedProduct = await product.save();
 
-        res.status(200).json({
-          _id: updatedProduct._id,
-          active: updatedProduct.active,
-          status: true,
-        });
-      } catch (error) {
-        console.error("Error updating product status:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+    res.status(200).json({
+      _id: updatedProduct._id,
+      active: updatedProduct.active,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error updating product status:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 const editProduct = asyncHandler(async (req, res, next) => {
@@ -857,7 +857,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
       products: productsWithFavoriteStatus,
       unreadNotificationsCount,
       notificationStatus,
-      cartProductCount
+      cartProductCount,
     });
   } catch (error) {
     console.error("Error fetching popular products:", error.message);
@@ -1019,6 +1019,53 @@ const getAllToolsProducts = asyncHandler(async (req, res) => {
   }
 });
 
+const addProductType = asyncHandler(async (req, res) => {
+  try {
+    const { type_name } = req.body;
+
+    // Validate input
+    if (!type_name) {
+      return res.status(400).json({ message: "Product type name is required." });
+    }
+
+    // Check if the product type already exists
+    const existingType = await ProductType.findOne({ type_name });
+    if (existingType) {
+      return res.status(400).json({ message: "Product type already exists." });
+    }
+
+    // Create a new product type
+    const newProductType = new ProductType({
+      type_name,
+    });
+
+    // Save to the database
+    await newProductType.save();
+
+    res.status(201).json({
+      message: "Product type added successfully.",
+      productType: newProductType,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
+const getProductTypes = asyncHandler(async (req, res) => {
+  try {
+    // Fetch all product types from the database
+    const productTypes = await ProductType.find();
+
+    // Return the result as a response
+    res.status(200).json({
+      message: "Product types retrieved successfully.",
+      productTypes,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
 module.exports = {
   updateSupplierProfileData,
   addProduct,
@@ -1042,4 +1089,6 @@ module.exports = {
   getAllToolsProducts,
   getSimilarProducts,
   updateProductDefaultStatus,
+  addProductType,
+  getProductTypes,
 };
