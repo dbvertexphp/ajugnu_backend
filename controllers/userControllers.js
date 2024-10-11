@@ -31,6 +31,7 @@ const Rating = require("../models/ratingModel.js");
 const fs = require("fs");
 const { addNotification } = require("./orderNotificationController");
 const { sendFCMNotification } = require("./notificationControllers");
+const sendEmail = require("../utils/emailSender");
 
 const getUsers = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -225,6 +226,19 @@ const registerUser = asyncHandler(async (req, res, next) => {
     });
 
     if (user) {
+      const sendEmailAsync = async () => {
+        const subject = "Welcome to Our Service!";
+        const text = `Hello ${full_name},\n\nThank you for registering.`;
+
+        try {
+          await sendEmail(email, subject, text); // Send email after user registration
+        } catch (error) {
+          console.error("Failed to send email notification:", error);
+        }
+      };
+
+      // Schedule the email to be sent
+      setImmediate(sendEmailAsync);
       // sendOTP(full_name, mobile, otp);
       try {
         const adminDashboard = await AdminDashboard.findOne();
@@ -422,6 +436,7 @@ const resendOTP = asyncHandler(async (req, res) => {
     status: true,
   });
 });
+
 const ForgetresendOTP = asyncHandler(async (req, res) => {
   const { mobile } = req.body;
 
@@ -483,6 +498,7 @@ const profilePicUpload = asyncHandler(async (req, res) => {
   //   throw new ErrorHandler("No file uploaded", 400);
   // });
 });
+
 const profilePicKey = asyncHandler(async (req, res) => {
   const userId = req.user._id; // Assuming you have user authentication middleware
   const profilePicKeys = req.body.profilePicKey;
@@ -1219,6 +1235,21 @@ const checkout = asyncHandler(async (req, res) => {
       // Pass supplier IDs as an array to the addNotification function
       await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, null, title, "order");
     }
+
+    // Send email
+    const sendEmailAsync = async () => {
+      const subject = 'Thank You for Your Purchase!';
+      const text = `Hello ${user.full_name},\n\nThank you for your purchase! We appreciate your business. If you have any questions or need assistance, feel free to reach out to us.`;
+
+      try {
+        await sendEmail(user.email, subject, text); // Send email after user registration
+      } catch (error) {
+        console.error("Failed to send email notification:", error);
+      }
+    };
+
+    // Schedule the email to be sent
+    setImmediate(sendEmailAsync);
 
     // Send notification to each supplier
     const supplierArray = Array.from(supplierIds);
@@ -2633,8 +2664,8 @@ const getProductsRendom = asyncHandler(async (req, res) => {
     const query = {
       $and: [
         { product_role: "supplier" },
-        {active: true},
-        {default_product: true},
+        { active: true },
+        { default_product: true },
         {
           $or: [{ english_name: { $regex: search, $options: "i" } }],
         },
@@ -2660,7 +2691,7 @@ const getProductsRendom = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching products:", error.message);
-    res.status(500).json({ message: "Internal Server Error", status: false })
+    res.status(500).json({ message: "Internal Server Error", status: false });
   }
 });
 
