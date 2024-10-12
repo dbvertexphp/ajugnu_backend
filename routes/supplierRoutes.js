@@ -59,7 +59,7 @@ supplierRoutes.put("/updateOrderItemStatus", protect, Authorization(["supplier",
 
 supplierRoutes.put("/updateSupplierProfileData", protect, Authorization(["supplier","both"]), updateSupplierProfileData);
 
-supplierRoutes.get("/getSupplierProfileData", protect, Authorization(["supplier","both"]), getSupplierProfileData);
+supplierRoutes.get("/getSupplierProfileData", protect, Authorization(["supplier","both","admin"]), getSupplierProfileData);
 
 supplierRoutes.get("/getSupplierOrderNotification", protect, Authorization(["supplier","both"]), getSupplierOrderNotification);
 

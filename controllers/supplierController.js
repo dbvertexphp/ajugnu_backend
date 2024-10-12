@@ -17,6 +17,8 @@ const OrderNotification = require("../models/orderNotificationModel.js");
 const Favorite = require("../models/favorite.js");
 const Cart = require("../models/cartModel.js");
 const ProductType = require("../models/product_type_Model.js");
+const sendEmail = require("../utils/emailSender");
+
 
 dotenv.config();
 
@@ -523,7 +525,11 @@ const getAllProductsInAdmin = asyncHandler(async (req, res) => {
       $and: [
         { product_role: "supplier" },
         {
-          $or: [{ english_name: { $regex: search, $options: "i" } }],
+          $or: [
+            { english_name: { $regex: search, $options: "i" } },
+            { local_name: { $regex: search, $options: "i" } },
+            { other_name: { $regex: search, $options: "i" } },
+          ],
         },
       ],
     };
@@ -735,7 +741,6 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
     } else {
       const order = await Order.findById(order_id);
       const user = await User.findById(order.user_id);
-      console.log(order.user_id);
 
       if (user.firebase_token || user.firebase_token == "dummy_token") {
         const registrationToken = user.firebase_token;
@@ -758,7 +763,6 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
           title = "Order Cancelled";
           body = `Your order has been cancelled. If you have any questions, please contact us.`;
         }
-        console.log(registrationToken);
         const notificationResult = await sendFCMNotification(registrationToken, title, body);
         if (notificationResult.success) {
           console.log("Notification sent successfully:", notificationResult.response);
@@ -767,6 +771,20 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
         }
 
         await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, [supplier_id], title, new_status);
+      }
+      if(new_status == "delivered"){
+      const sendEmailAsync = async () => {
+            const subject = "Order Delivered";
+            const text = `Hello ${user.full_name},\n\nYour order has been delivered. Enjoy your purchase!`;
+
+            try {
+              await sendEmail(user.email, subject, text); // Send email after user registration
+            } catch (error) {
+              console.error("Failed to send email notification:", error);
+            }
+          };
+          // Schedule the email to be sent
+          setImmediate(sendEmailAsync);
       }
     }
 

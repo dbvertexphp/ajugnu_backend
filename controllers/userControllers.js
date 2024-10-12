@@ -607,6 +607,20 @@ const forgetPassword = asyncHandler(async (req, res) => {
     // Fetch the updated user
     const updatedUser = await User.findById(user._id);
 
+    const sendEmailAsync = async () => {
+      const subject = "Password Reset Successful!";
+      const text = `Hello ${updatedUser.full_name},\n\nYour password has been successfully reset. You can now log in with your new password.\n\nIf you did not request this change, please contact our support team immediately.\n\nThank you!`;
+
+      try {
+        await sendEmail(updatedUser.email, subject, text); // Send email after user registration
+      } catch (error) {
+        console.error("Failed to send email notification:", error);
+      }
+    };
+
+    // Schedule the email to be sent
+    setImmediate(sendEmailAsync);
+
     res.status(200).json({
       message: "Password reset successfully.",
       updatedUser,
@@ -655,6 +669,19 @@ const ChangePassword = asyncHandler(async (req, res, next) => {
 
     // Fetch the updated user
     const updatedUser = await User.findById(user._id);
+    const sendEmailAsync = async () => {
+      const subject = "Password changed Successful!";
+      const text = `Hello ${updatedUser.full_name},\n\nYour password has been successfully changed. You can now log in with your new password.\n\nIf you did not request this change, please contact our support team immediately.\n\nThank you!`;
+
+      try {
+        await sendEmail(updatedUser.email, subject, text); // Send email after user registration
+      } catch (error) {
+        console.error("Failed to send email notification:", error);
+      }
+    };
+
+    // Schedule the email to be sent
+    setImmediate(sendEmailAsync);
 
     res.status(200).json({
       message: "Password changed successfully.",
@@ -1238,7 +1265,7 @@ const checkout = asyncHandler(async (req, res) => {
 
     // Send email
     const sendEmailAsync = async () => {
-      const subject = 'Thank You for Your Purchase!';
+      const subject = "Thank You for Your Purchase!";
       const text = `Hello ${user.full_name},\n\nThank you for your purchase! We appreciate your business. If you have any questions or need assistance, feel free to reach out to us.`;
 
       try {
@@ -1269,6 +1296,21 @@ const checkout = asyncHandler(async (req, res) => {
         }
         await addNotification(savedOrder.user_id, savedOrder._id, supplierBody, savedOrder.total_amount, Array.from(supplierIds), supplierTitle, "order");
       }
+
+      // Send email
+      const sendEmailAsync = async () => {
+        const subject = "Thank You for Your Purchase!";
+        const text = `Hello ${supplier.full_name},\n\nThank you for your purchase! We appreciate your business. If you have any questions or need assistance, feel free to reach out to us.`;
+
+        try {
+          await sendEmail(supplier.email, subject, text); // Send email after user registration
+        } catch (error) {
+          console.error("Failed to send email notification:", error);
+        }
+      };
+
+      // Schedule the email to be sent
+      setImmediate(sendEmailAsync);
     }
 
     // Update product stock and clear user's cart (as before)
@@ -1348,6 +1390,7 @@ const getAllOrders = asyncHandler(async (req, res) => {
             { "shipping_address.pincode": { $regex: search, $options: "i" } },
             { "shipping_address.mobile_number": { $regex: search, $options: "i" } },
             { payment_method: { $regex: search, $options: "i" } },
+            { order_id: { $regex: search, $options: "i" } },
           ],
         }
       : {};
@@ -1697,88 +1740,107 @@ const getBankDetailsAdmin = asyncHandler(async (req, res) => {
 });
 
 const getAllUsers = asyncHandler(async (req, res) => {
-  try {
-    const { page = 1, limit = 10, search = "" } = req.query;
-    const skip = (page - 1) * limit;
-    const searchRegex = new RegExp(search, "i");
+      try {
+        const { page = 1, limit = 10, search = "" } = req.query;
+        const skip = (page - 1) * limit;
+        const searchRegex = new RegExp(search, "i");
 
-    const users = await User.find({
-      role: "user",
-      $or: [
-        { name: searchRegex }, // Assuming you want to search by name
-        { email: searchRegex }, // Assuming you want to search by email
-        // Add other fields as needed
-      ],
-    })
-      .skip(skip)
-      .limit(Number(limit));
-    const totalUsers = await User.countDocuments({ role: "user" });
+        // Convert search to a number if it is numeric
+        const mobileSearch = isNaN(search) ? null : Number(search);
 
-    const transformedUsersPromises = users.map(async (user) => {
-      let transformedUser = { ...user.toObject() };
-      if (transformedUser.pic) {
-        const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
-        transformedUser.pic = getSignedUrl_pic;
+        const users = await User.find({
+          role: "user",
+          $or: [
+            { name: searchRegex },      // Search by name
+            { email: searchRegex },     // Search by email
+            { mobile: mobileSearch },    // Search by mobile number (as a number)
+          ].filter(condition => condition) // Filter out undefined conditions
+        })
+          .skip(skip)
+          .limit(Number(limit));
+
+        // Get total count of users matching the role and search criteria
+        const totalUsers = await User.countDocuments({
+          role: "user",
+          $or: [
+            { name: searchRegex },
+            { email: searchRegex },
+            ...(mobileSearch !== null ? [{ mobile: mobileSearch }] : []), // Only add mobile search if it is valid
+          ],
+        });
+
+        const transformedUsersPromises = users.map(async (user) => {
+          let transformedUser = { ...user.toObject() };
+          if (transformedUser.pic) {
+            const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
+            transformedUser.pic = getSignedUrl_pic;
+          }
+          if (transformedUser.watch_time) {
+            transformedUser.watch_time = convertSecondsToReadableTimeAdmin(transformedUser.watch_time);
+          }
+          return { user: transformedUser };
+        });
+
+        const transformedUsers = await Promise.all(transformedUsersPromises);
+
+        res.json({
+          Users: transformedUsers,
+          total_rows: totalUsers,
+          totalPages: Math.ceil(totalUsers / limit),
+          currentPage: Number(page),
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({
+          message: "Internal Server Error",
+          status: false,
+        });
       }
-      if (transformedUser.watch_time) {
-        transformedUser.watch_time = convertSecondsToReadableTimeAdmin(transformedUser.watch_time);
-      }
-      return { user: transformedUser };
-    });
-
-    const transformedUsers = await Promise.all(transformedUsersPromises);
-
-    res.json({
-      Users: transformedUsers,
-      total_rows: totalUsers,
-      totalPages: Math.ceil(totalUsers / limit),
-      currentPage: Number(page),
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      status: false,
-    });
-  }
 });
+
 
 const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+      try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
 
-    // Get the search keyword from query params
-    const searchKeyword = req.query.search || "";
+        // Get the search keyword from query params
+        const searchKeyword = req.query.search || "";
 
-    // Construct the query to search by full_name and filter by role 'supplier'
-    const query = {
-      role: "supplier",
-      full_name: { $regex: searchKeyword, $options: "i" }, // Case-insensitive search
-    };
 
-    // Fetch suppliers based on the query, skip, and limit
-    const suppliers = await User.find(query).skip(skip).limit(limit);
+        // Construct the query to search by full_name, email, or mobile and filter by role 'supplier'
+        const query = {
+          role: "supplier",
+          $or: [
+            { full_name: { $regex: searchKeyword, $options: "i" } },
+            { email: { $regex: searchKeyword, $options: "i" } },
+            ...(isNaN(searchKeyword) ? [] : [{ mobile: Number(searchKeyword) }])
+          ],
+        };
 
-    // Get the total number of suppliers that match the query
-    const totalSuppliers = await User.countDocuments(query);
+        // Fetch suppliers based on the query, skip, and limit
+        const suppliers = await User.find(query).skip(skip).limit(limit);
 
-    // Return the results along with pagination details
-    res.json({
-      Suppliers: suppliers,
-      total_rows: totalSuppliers,
-      current_page: page,
-      total_pages: Math.ceil(totalSuppliers / limit),
+        // Get the total number of suppliers that match the query
+        const totalSuppliers = await User.countDocuments(query);
+
+        // Return the results along with pagination details
+        res.json({
+          Suppliers: suppliers,
+          total_rows: totalSuppliers,
+          current_page: page,
+          total_pages: Math.ceil(totalSuppliers / limit),
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({
+          message: "Internal Server Error",
+          status: false,
+        });
+      }
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      status: false,
-    });
-  }
-});
+
 
 const searchUsers = asyncHandler(async (req, res) => {
   const { page = 1, name = "" } = req.body;
@@ -2695,6 +2757,27 @@ const getProductsRendom = asyncHandler(async (req, res) => {
   }
 });
 
+const getUserDetails = asyncHandler(async (req, res) => {
+  const { user_id } = req.body; // Assuming you have user authentication middleware
+
+  try {
+    // Find the user by ID
+    const user = await User.findById(user_id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Return the user's profile information
+    return res.status(200).json({
+      user: user,
+      status: true,
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", error.message);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 module.exports = {
   getUsers,
   registerUser,
@@ -2747,4 +2830,5 @@ module.exports = {
   getProductsByOrderAndSupplier,
   updateUserPincode,
   getProductsRendom,
+  getUserDetails,
 };
