@@ -51,7 +51,9 @@ const {
   getProductsByOrderAndSupplier,
   updateUserPincode,
   getProductsRendom,
-  getUserDetails
+  getUserDetails,
+  updateNumberToString,
+  updatePinCodeToString
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -159,5 +161,10 @@ userRoutes.route("/updateProfileDataByAdmin").post(protect, updateProfileDataByA
 userRoutes.route("/getCoursesByTeacherId/:teacher_id").get(protect, getCoursesByTeacherId);
 
 userRoutes.route("/getAllSuppliersInAdmin").get(protect, getAllSuppliersInAdmin);
+
+
+userRoutes.route("/updateNumberToString").post(updateNumberToString);
+userRoutes.route("/updatePinCodeToString").post(updatePinCodeToString);
+
 
 module.exports = { userRoutes };

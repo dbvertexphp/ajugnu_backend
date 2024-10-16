@@ -7,13 +7,13 @@ const userSchema = mongoose.Schema({
   email: {
     type: String,
   },
-  mobile: { type: Number, unique: true },
+  mobile: { type: String, unique: true },
   password: { type: String, required: true },
   role: { type: String, required: true, enum: ["user", "supplier", "both"] },
   otp: { type: String },
   otp_verified: { type: Number, default: 0 },
   firebase_token: { type: String, default: "dummy_token" },
-  pin_code: { type: [Number], default: [] },
+  pin_code: { type: [String], default: [] },
   profile_pic: {
     type: String,
   },
