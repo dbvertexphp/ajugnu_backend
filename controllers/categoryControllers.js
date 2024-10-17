@@ -211,7 +211,7 @@ const GetSingleCategoryByName = asyncHandler(async (req, res) => {
 
 const GetAllCategoriesAdminpage = asyncHandler(async (req, res, next) => {
   const { page = 1 } = req.body;
-  const perPage = 10; // Number of documents to display per page
+  const perPage = 5; // Number of documents to display per page
 
   // Calculate the number of documents to skip
   const skip = (page - 1) * perPage;

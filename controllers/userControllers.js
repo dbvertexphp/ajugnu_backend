@@ -1967,13 +1967,13 @@ const getAllDashboardCount = asyncHandler(async (req, res) => {
       {
         $group: {
           _id: null,
-          totalAmount: { $sum: "$amount" }, // Summing the "amount" field
+          total_amount: { $sum: "$total_amount" }, // Summing the "amount" field
         },
       },
     ]);
 
     // Extracting the total sum of the "amount" field
-    const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].totalAmount : 0;
+    const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].total_amount  : 0;
 
     res.status(200).json({
       teacherCount: teacherCount,
