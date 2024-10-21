@@ -8,11 +8,9 @@ const { sendFCMNotification } = require("./notificationControllers");
 
 const addTransaction = asyncHandler(async (req, res) => {
   const user_id = req.headers.userID;
-  const { order_id, payment_id, payment_status, total_amount, payment_method, status } = req.body;
-  console.log(req.body);
+  const { order_id, payment_id, payment_status, total_amount, payment_method, status, user_name } = req.body;
 
-
-  if ( !order_id || !total_amount || !payment_method || !status) {
+  if (!order_id || !total_amount || !payment_method || !status) {
     return res.status(400).json({ message: "Invalid input", status: false });
   }
 
@@ -34,12 +32,13 @@ const addTransaction = asyncHandler(async (req, res) => {
     const newTransaction = new Transaction({
       user_id,
       order_id,
-      payment_id : payment_id || null,
-      payment_status : payment_status || "pending",
+      payment_id: payment_id || null,
+      payment_status: payment_status || "pending",
       total_amount,
       payment_method,
       status,
       items,
+      user_name,
     });
 
     const savedTransaction = await newTransaction.save();
@@ -57,9 +56,8 @@ const addTransaction = asyncHandler(async (req, res) => {
         } else {
           console.error("Failed to send notification:", notificationResult.error);
         }
-        await addNotification(user_id,order_id,body,total_amount, [item.supplier_id],title,payment_method);
+        await addNotification(user_id, order_id, body, total_amount, [item.supplier_id], title, payment_method);
       }
-
     }
 
     res.status(201).json({
@@ -297,46 +295,39 @@ const getAllTransactionsByTeacher = asyncHandler(async (req, res) => {
 });
 
 const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
-      const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
-      console.log(page);
-      try {
-        // Build the search query
-        const searchQuery = search
-          ? {
-              $or: [
-                { user_id: { $regex: search, $options: "i" } }, // Searching by user ID
-                { order_id: { $regex: search, $options: "i" } }, // Searching by order ID
-                { payment_status: { $regex: search, $options: "i" } }, // Searching by payment status
-                // You can add more fields here if needed
-              ],
-            }
-          : {};
+  const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
+  try {
+    // Build the search query
+    const searchQuery = search
+      ? {
+          $or: [
+            { user_name: { $regex: search, $options: "i" } }, // Searching by user ID
+          ],
+        }
+      : {};
 
-        // Fetch transactions with pagination and search
-        const transactions = await Transaction.find(searchQuery)
-          .sort({ [sortBy]: order === "desc" ? -1 : 1 })
-          .skip((page - 1) * limit)
-          .limit(parseInt(limit))
-          .populate("user_id order_id items.product_id items.supplier_id");
+    // Fetch transactions with pagination and search
+    const transactions = await Transaction.find(searchQuery)
+      .sort({ [sortBy]: order === "desc" ? -1 : 1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
+      .populate("user_id order_id items.product_id items.supplier_id");
 
-        // Count total number of transactions matching the search query
-        const totalTransactions = await Transaction.countDocuments(searchQuery);
+    // Count total number of transactions matching the search query
+    const totalTransactions = await Transaction.countDocuments(searchQuery);
 
-        res.status(200).json({
-          message: "Transactions fetched successfully",
-          transactions,
-          totalPages: Math.ceil(totalTransactions / limit),
-          currentPage: parseInt(page),
-          totalTransactions,
-        });
-      } catch (error) {
-        console.error("Error fetching transactions:", error.message);
-        res.status(500).json({ message: "Internal Server Error", status: false });
-      }
+    res.status(200).json({
+      message: "Transactions fetched successfully",
+      transactions,
+      totalPages: Math.ceil(totalTransactions / limit),
+      currentPage: parseInt(page),
+      totalTransactions,
+    });
+  } catch (error) {
+    console.error("Error fetching transactions:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
 });
-
-
-
 
 module.exports = {
   addTransaction,

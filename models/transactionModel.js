@@ -49,6 +49,9 @@ const transactionSchema = new Schema(
       type: String,
       default: () => moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
     },
+    user_name :{
+      type: String,
+    }
   },
   { timestamps: true }
 );

@@ -93,7 +93,7 @@ userRoutes.route("/checkout").post(protect, Authorization(["user","both"]), chec
 userRoutes.route("/removeFromCart").post(protect, Authorization(["user","both"]), removeFromCart);
 userRoutes.route("/getUserOrderDetails").get(protect, Authorization(["user","both"]), getUserOrderDetails);
 userRoutes.route("/addRating").post(protect, Authorization(["user","both"]), addRating);
-userRoutes.route("/getOrderNotifications").get(protect, getOrderNotifications);
+userRoutes.route("/getOrderNotifications").get(protect, Authorization(["user","both"]), getOrderNotifications);
 userRoutes.route("/getPopularProduct").get(protect, Authorization(["user","both"]), getPopularProduct);
 userRoutes.route("/updateUserPincode").post(protect, Authorization(["user","both"]), updateUserPincode);
 userRoutes.route("/getProductsRendom").get(protect, Authorization(["user","both","admin"]), getProductsRendom);

@@ -1753,16 +1753,14 @@ const getAllUsers = asyncHandler(async (req, res) => {
     const query = {
       role: "user",
       $or: [
-        ...(searchRegex ? [{ full_name: searchRegex }] : []),    // Search by name if regex is valid
-        ...(searchRegex ? [{ email: searchRegex }] : []),   // Search by email if regex is valid
+        ...(searchRegex ? [{ full_name: searchRegex }] : []), // Search by name if regex is valid
+        ...(searchRegex ? [{ email: searchRegex }] : []), // Search by email if regex is valid
         ...(mobileSearch ? [{ mobile: mobileSearch }] : []), // Search by mobile if valid
         ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : []), // Search by pincode if valid
-      ]
+      ],
     };
 
-    const users = await User.find(query)
-      .skip(skip)
-      .limit(Number(limit));
+    const users = await User.find(query).skip(skip).limit(Number(limit));
 
     // Get total count of users matching the role and search criteria
     const totalUsers = await User.countDocuments(query);
@@ -1834,59 +1832,52 @@ const getAllUsers = asyncHandler(async (req, res) => {
 // });
 
 const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
-      try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-        // Get the search keyword from query params
-        const search = req.query.search || "";
+    // Get the search keyword from query params
+    const search = req.query.search || "";
 
-        // Create case-insensitive regex for searching full_name and email
-        const searchRegex = search ? new RegExp(search, "i") : null;
+    // Create case-insensitive regex for searching full_name and email
+    const searchRegex = search ? new RegExp(search, "i") : null;
 
-        // Handle numeric search for mobile
-        const mobileSearch = isNaN(search) ? null : new RegExp(search);
-        const pincodeSearch = isNaN(search) ? null : new RegExp(search);
+    // Handle numeric search for mobile
+    const mobileSearch = isNaN(search) ? null : new RegExp(search);
+    const pincodeSearch = isNaN(search) ? null : new RegExp(search);
 
-        // Construct the query to search by full_name, email, or mobile and filter by role 'supplier'
-        let query = {
-          role: "supplier",
-        };
+    // Construct the query to search by full_name, email, or mobile and filter by role 'supplier'
+    let query = {
+      role: "supplier",
+    };
 
-        // Add $or condition only if there is a search term
-        if (search) {
-          query.$or = [
-            ...(searchRegex ? [{ full_name: searchRegex }] : []),
-            ...(searchRegex ? [{ email: searchRegex }] : []),
-            ...(mobileSearch !== null ? [{ mobile: mobileSearch }] : []),
-            ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : []),
-          ];
-        }
+    // Add $or condition only if there is a search term
+    if (search) {
+      query.$or = [...(searchRegex ? [{ full_name: searchRegex }] : []), ...(searchRegex ? [{ email: searchRegex }] : []), ...(mobileSearch !== null ? [{ mobile: mobileSearch }] : []), ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : [])];
+    }
 
-        // Fetch suppliers based on the query, skip, and limit
-        const suppliers = await User.find(query).skip(skip).limit(limit);
+    // Fetch suppliers based on the query, skip, and limit
+    const suppliers = await User.find(query).skip(skip).limit(limit);
 
-        // Get the total number of suppliers that match the query
-        const totalSuppliers = await User.countDocuments(query);
+    // Get the total number of suppliers that match the query
+    const totalSuppliers = await User.countDocuments(query);
 
-        // Return the results along with pagination details
-        res.json({
-          Suppliers: suppliers,
-          total_rows: totalSuppliers,
-          current_page: page,
-          total_pages: Math.ceil(totalSuppliers / limit),
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({
-          message: "Internal Server Error",
-          status: false,
-        });
-      }
+    // Return the results along with pagination details
+    res.json({
+      Suppliers: suppliers,
+      total_rows: totalSuppliers,
+      current_page: page,
+      total_pages: Math.ceil(totalSuppliers / limit),
     });
-
-
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      status: false,
+    });
+  }
+});
 
 const searchUsers = asyncHandler(async (req, res) => {
   const { page = 1, name = "" } = req.body;
@@ -1973,7 +1964,7 @@ const getAllDashboardCount = asyncHandler(async (req, res) => {
     ]);
 
     // Extracting the total sum of the "amount" field
-    const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].total_amount  : 0;
+    const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].total_amount : 0;
 
     res.status(200).json({
       teacherCount: teacherCount,
@@ -2823,68 +2814,61 @@ const getUserDetails = asyncHandler(async (req, res) => {
 });
 
 const updateNumberToString = asyncHandler(async (req, res) => {
-      try {
+  try {
+    // Update the specific user's mobile number to a string using aggregation
+    const result = await User.updateMany(
+      // Match the user by ID
+      [
+        {
+          $set: {
+            mobile: { $toString: "$mobile" }, // Convert mobile number to string
+          },
+        },
+      ]
+    );
 
-        // Update the specific user's mobile number to a string using aggregation
-        const result = await User.updateMany( // Match the user by ID
-          [
-            {
-              $set: {
-                mobile: { $toString: "$mobile" }, // Convert mobile number to string
-              },
-            },
-          ]
-        );
-
-        res.status(200).json({
-          message: "Mobile number updated successfully.",
-          modifiedCount: result.modifiedCount,
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({
-          message: "Internal Server Error",
-          status: false,
-        });
-      }
+    res.status(200).json({
+      message: "Mobile number updated successfully.",
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      status: false,
+    });
+  }
 });
 
-
 const updatePinCodeToString = asyncHandler(async (req, res) => {
-      try {
-        // Update the pin_code array in all documents, converting each pin code to a string
-        const result = await User.updateMany(
-          {},
-          [
-            {
-              $set: {
-                pin_code: {
-                  $map: {
-                    input: "$pin_code", // Loop over the pin_code array
-                    as: "pin",          // Alias for each element in the array
-                    in: { $toString: "$$pin" }, // Convert each pin code to string
-                  },
-                },
-              },
+  try {
+    // Update the pin_code array in all documents, converting each pin code to a string
+    const result = await User.updateMany({}, [
+      {
+        $set: {
+          pin_code: {
+            $map: {
+              input: "$pin_code", // Loop over the pin_code array
+              as: "pin", // Alias for each element in the array
+              in: { $toString: "$$pin" }, // Convert each pin code to string
             },
-          ]
-        );
+          },
+        },
+      },
+    ]);
 
-        res.status(200).json({
-          message: "Pin codes updated successfully.",
-          modifiedCount: result.modifiedCount,
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({
-          message: "Internal Server Error",
-          status: false,
-        });
-      }
+    res.status(200).json({
+      message: "Pin codes updated successfully.",
+      modifiedCount: result.modifiedCount,
     });
-
-
-
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      status: false,
+    });
+  }
+});
 
 module.exports = {
   getUsers,

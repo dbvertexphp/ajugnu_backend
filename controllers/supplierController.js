@@ -19,7 +19,6 @@ const Cart = require("../models/cartModel.js");
 const ProductType = require("../models/product_type_Model.js");
 const sendEmail = require("../utils/emailSender");
 
-
 dotenv.config();
 
 const updateSupplierProfileData = asyncHandler(async (req, res) => {
@@ -254,7 +253,7 @@ const updateProductDefaultStatus = asyncHandler(async (req, res) => {
 });
 
 const updateProductStatus = asyncHandler(async (req, res) => {
-  const { productId, active } = req.body; // Get the product ID from the URL parameters
+  const { productId, active, supplier_id } = req.body; // Get the product ID from the URL parameters
 
   if (typeof active !== "boolean") {
     return res.status(400).json({ message: "Invalid status value. It should be true or false.", status: false });
@@ -265,6 +264,23 @@ const updateProductStatus = asyncHandler(async (req, res) => {
 
     if (!product) {
       return res.status(404).json({ message: "Product not found", status: false });
+    }
+
+    const supplier = await User.findById(supplier_id);
+    let status = active ? "approved" : "not approved";
+
+    if (supplier.firebase_token || supplier.firebase_token == "dummy_token") {
+      const registrationToken = supplier.firebase_token;
+      const title = "Product Status";
+      const body = `Your product has been ${status}!`;
+
+      const notificationResult = await sendFCMNotification(registrationToken, title, body);
+      if (notificationResult.success) {
+        console.log("Notification sent successfully:", notificationResult.response);
+      } else {
+        console.error("Failed to send notification:", notificationResult.error);
+      }
+      await addNotification(null, null, body, null, [supplier_id], title, status);
     }
 
     product.active = active;
@@ -525,17 +541,14 @@ const getAllProductsInAdmin = asyncHandler(async (req, res) => {
       $and: [
         { product_role: "supplier" },
         {
-          $or: [
-            { english_name: { $regex: search, $options: "i" } },
-            { local_name: { $regex: search, $options: "i" } },
-            { other_name: { $regex: search, $options: "i" } },
-          ],
+          $or: [{ english_name: { $regex: search, $options: "i" } }, { local_name: { $regex: search, $options: "i" } }, { other_name: { $regex: search, $options: "i" } }],
         },
       ],
     };
 
     const totalProducts = await Product.countDocuments(query);
     const products = await Product.find(query)
+      .populate("category_id")
       .sort({ [sortBy]: order })
       .skip((page - 1) * limit)
       .limit(limit);
@@ -770,21 +783,21 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
           console.error("Failed to send notification:", notificationResult.error);
         }
 
-        await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, [supplier_id], title, new_status);
+        await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, null, title, new_status);
       }
-      if(new_status == "delivered"){
-      const sendEmailAsync = async () => {
-            const subject = "Order Delivered";
-            const text = `Hello ${user.full_name},\n\nYour order has been delivered. Enjoy your purchase!`;
+      if (new_status == "delivered") {
+        const sendEmailAsync = async () => {
+          const subject = "Order Delivered";
+          const text = `Hello ${user.full_name},\n\nYour order has been delivered. Enjoy your purchase!`;
 
-            try {
-              await sendEmail(user.email, subject, text); // Send email after user registration
-            } catch (error) {
-              console.error("Failed to send email notification:", error);
-            }
-          };
-          // Schedule the email to be sent
-          setImmediate(sendEmailAsync);
+          try {
+            await sendEmail(user.email, subject, text); // Send email after user registration
+          } catch (error) {
+            console.error("Failed to send email notification:", error);
+          }
+        };
+        // Schedule the email to be sent
+        setImmediate(sendEmailAsync);
       }
     }
 
