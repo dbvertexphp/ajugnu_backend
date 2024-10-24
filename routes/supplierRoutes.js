@@ -14,6 +14,7 @@ const {
   updateOrderItemStatus,
   getAllProducts,
   getProductsBySupplierId,
+  getProductsByEnglishName,
   getAllProductsInAdmin,
   updateProductStatus,
   getSupplierOrderNotification,
@@ -48,6 +49,8 @@ supplierRoutes.get("/getAllProducts", protect, getAllProducts);
 supplierRoutes.get("/getAllProductsInAdmin", protect, getAllProductsInAdmin);
 
 supplierRoutes.post("/getProductsBySupplierId", protect, getProductsBySupplierId);
+
+supplierRoutes.post("/getProductsByEnglishName", protect, getProductsByEnglishName);
 
 supplierRoutes.get("/getPincode", protect, Authorization(["supplier","both"]), getPincode);
 

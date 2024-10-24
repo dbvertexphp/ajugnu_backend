@@ -595,6 +595,25 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+const getProductsByEnglishName = asyncHandler(async (req, res) => {
+  const { english_name } = req.body; // Assuming user authentication middleware sets this header
+
+  try {
+    if (!english_name) {
+      return res.status(400).json({
+        message: "Product name is required.",
+        status: false,
+      });
+    }
+    const products = await Product.find({ english_name: english_name });
+
+    res.json({ products, status: true }); // Change 'product' to 'products'
+  } catch (error) {
+    console.error("Error fetching product:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
 const getProductById = asyncHandler(async (req, res) => {
   const { product_id } = req.body; // Assuming user authentication middleware sets this header
@@ -1110,6 +1129,7 @@ module.exports = {
   updateOrderItemStatus,
   getAllProducts,
   getProductsBySupplierId,
+  getProductsByEnglishName,
   getAllProductsInAdmin,
   updateProductStatus,
   getPopularProduct,
