@@ -313,6 +313,9 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
       .limit(parseInt(limit))
       .populate("user_id order_id items.product_id items.supplier_id");
 
+      console.log(transactions);
+
+
     // Count total number of transactions matching the search query
     const totalTransactions = await Transaction.countDocuments(searchQuery);
 
@@ -328,6 +331,48 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", status: false });
   }
 });
+
+// const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
+//   const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
+
+//   try {
+//     // Get a list of users matching the search term to filter transactions by user_id
+//     const userIds = search
+//       ? await User.find({ full_name: { $regex: search, $options: "i" } }).select("_id")
+//       : [];
+
+//       console.log(userIds);
+
+
+//     const searchQuery = search
+//       ? { user_id: { $in: userIds.map(user => user._id) } }
+//       : {};
+
+//     // Fetch transactions with pagination, sorting, and the search filter
+//     const transactions = await Transaction.find(searchQuery)
+//       .sort({ [sortBy]: order === "desc" ? -1 : 1 })
+//       .skip((page - 1) * limit)
+//       .limit(parseInt(limit))
+//       .populate("user_id", "full_name")  // Populate to get user full name
+//       .populate("order_id items.product_id items.supplier_id");
+
+//     // Count total number of transactions matching the search query
+//     const totalTransactions = await Transaction.countDocuments(searchQuery);
+
+//     res.status(200).json({
+//       message: "Transactions fetched successfully",
+//       transactions,
+//       totalPages: Math.ceil(totalTransactions / limit),
+//       currentPage: parseInt(page),
+//       totalTransactions,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching transactions:", error.message);
+//     res.status(500).json({ message: "Internal Server Error", status: false });
+//   }
+// });
+
+
 
 module.exports = {
   addTransaction,

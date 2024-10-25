@@ -1441,7 +1441,7 @@ const getProductsByOrderAndSupplier = asyncHandler(async (req, res) => {
     const order = await Order.findById(order_id)
       .populate("user_id", "full_name email") // Populate user details
       .populate("items.product_id", "english_name price") // Populate product details
-      .populate("items.supplier_id", "full_name") // Populate user details // Populate supplier details for items
+      .populate("items.supplier_id", "full_name email mobile pin_code profile_pic") // Populate user details // Populate supplier details for items
       .exec();
 
     if (!order) {
@@ -1453,7 +1453,7 @@ const getProductsByOrderAndSupplier = asyncHandler(async (req, res) => {
 
     // Fetch product details
     const products = await Product.find({ _id: { $in: productIds } })
-      .populate("supplier_id", "full_name") // Populate supplier details if needed
+      .populate("supplier_id", "full_name email mobile pin_code profile_pic") // Populate supplier details if needed
       .exec();
 
     res.status(200).json({
@@ -1475,6 +1475,10 @@ const getProductsByOrderAndSupplier = asyncHandler(async (req, res) => {
           supplier_id: {
             _id: item.supplier_id._id,
             full_name: item.supplier_id.full_name,
+            email: item.supplier_id.email,
+            mobile: item.supplier_id.mobile,
+            pin_code: item.supplier_id.pin_code,
+            profile_pic: item.supplier_id.profile_pic,
           },
         })),
         payment_method: order.payment_method,

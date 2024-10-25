@@ -54,7 +54,7 @@ supplierRoutes.post("/getProductsByEnglishName", protect, getProductsByEnglishNa
 
 supplierRoutes.get("/getPincode", protect, Authorization(["supplier","both"]), getPincode);
 
-supplierRoutes.get("/getProductById", protect, Authorization(["supplier", "admin","both"]), getProductById);
+supplierRoutes.post("/getProductById", protect, Authorization(["supplier", "admin","both"]), getProductById);
 
 supplierRoutes.get("/getOrdersBySupplierId", protect, Authorization(["supplier", "admin","both"]), getOrdersBySupplierId);
 

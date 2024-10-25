@@ -541,7 +541,15 @@ const getAllProductsInAdmin = asyncHandler(async (req, res) => {
       $and: [
         { product_role: "supplier" },
         {
-          $or: [{ english_name: { $regex: search, $options: "i" } }, { local_name: { $regex: search, $options: "i" } }, { other_name: { $regex: search, $options: "i" } }],
+          $or: [
+            { english_name: { $regex: search, $options: "i" } },
+            { local_name: { $regex: search, $options: "i" } },
+            { other_name: { $regex: search, $options: "i" } },
+            { product_type: { $regex: search, $options: "i" } },
+            { product_size: { $regex: search, $options: "i" } },
+            { price: isNaN(search) ? null : Number(search) },
+            { quantity: isNaN(search) ? null : Number(search) },
+         ],
         },
       ],
     };
@@ -581,7 +589,8 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
 
     const skip = (page - 1) * limit;
     const totalProducts = await Product.countDocuments({ supplier_id });
-    const products = await Product.find({ supplier_id, active: true }).skip(skip).limit(limit);
+    const products = await Product.find({ supplier_id, active: true }).populate("supplier_id")
+    .skip(skip).limit(limit);
 
     res.status(200).json({
       products,
@@ -613,7 +622,6 @@ const getProductsByEnglishName = asyncHandler(async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 
 const getProductById = asyncHandler(async (req, res) => {
   const { product_id } = req.body; // Assuming user authentication middleware sets this header
