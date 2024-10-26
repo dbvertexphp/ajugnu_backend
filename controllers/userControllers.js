@@ -1798,7 +1798,6 @@ const getAllUsers = asyncHandler(async (req, res) => {
   }
 });
 
-
 const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -1817,7 +1816,7 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
 
     // Construct the query to search by full_name, email, or mobile and filter by role 'supplier'
     let query = {
-      role: "supplier",
+      role: { $in: ["supplier", "both"] },
     };
 
     // Add $or condition only if there is a search term
