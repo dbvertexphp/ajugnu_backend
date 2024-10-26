@@ -47,7 +47,7 @@ jobs:
       # Step 4: Clean up temporary backup files
       - name: Clean up backup files
         run: |
-          find /tmp -name uploads_backup.tar.gz -exec rm -f {} \; 2>/dev/null
+          find /tmp -name uploads_backup.tar.gz -exec rm -f {} \; 2>/dev/null || true
           echo "Backup files cleaned up."
 
       # Step 5: Set up Node.js and install dependencies
