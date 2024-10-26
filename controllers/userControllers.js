@@ -1798,42 +1798,6 @@ const getAllUsers = asyncHandler(async (req, res) => {
   }
 });
 
-// const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 10;
-//     const skip = (page - 1) * limit;
-
-//     // Get the search keyword from query params
-//     const searchKeyword = req.query.search || "";
-
-//     // Construct the query to search by full_name, email, or mobile and filter by role 'supplier'
-//     const query = {
-//       role: "supplier",
-//       $or: [{ full_name: { $regex: searchKeyword, $options: "i" } }, { email: { $regex: searchKeyword, $options: "i" } }, ...(isNaN(searchKeyword) ? [] : [{ mobile: Number(searchKeyword) }])],
-//     };
-
-//     // Fetch suppliers based on the query, skip, and limit
-//     const suppliers = await User.find(query).skip(skip).limit(limit);
-
-//     // Get the total number of suppliers that match the query
-//     const totalSuppliers = await User.countDocuments(query);
-
-//     // Return the results along with pagination details
-//     res.json({
-//       Suppliers: suppliers,
-//       total_rows: totalSuppliers,
-//       current_page: page,
-//       total_pages: Math.ceil(totalSuppliers / limit),
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       status: false,
-//     });
-//   }
-// });
 
 const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
   try {
@@ -2894,6 +2858,8 @@ const updateUserRole = asyncHandler(async (req, res, next) => {
           return next(new ErrorHandler("User not found.", 404));
         }
 
+        const token = jwt.sign({ _id: updatedUser._id, role: updatedUser.role }, process.env.JWT_SECRET);
+
         res.status(200).json({
           message: "User role updated successfully.",
           user: {
@@ -2902,6 +2868,7 @@ const updateUserRole = asyncHandler(async (req, res, next) => {
             email: updatedUser.email,
             mobile: updatedUser.mobile,
             role: updatedUser.role,
+            token,
           },
         });
       } catch (error) {

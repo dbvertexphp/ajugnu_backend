@@ -18,6 +18,7 @@ const Favorite = require("../models/favorite.js");
 const Cart = require("../models/cartModel.js");
 const ProductType = require("../models/product_type_Model.js");
 const sendEmail = require("../utils/emailSender");
+const { log } = require("console");
 
 dotenv.config();
 
@@ -549,7 +550,7 @@ const getAllProductsInAdmin = asyncHandler(async (req, res) => {
             { product_size: { $regex: search, $options: "i" } },
             { price: isNaN(search) ? null : Number(search) },
             { quantity: isNaN(search) ? null : Number(search) },
-         ],
+          ],
         },
       ],
     };
@@ -579,6 +580,7 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
   const limit = 10; // Number of products per page
 
+
   try {
     if (!supplier_id) {
       return res.status(400).json({
@@ -589,11 +591,16 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
 
     const skip = (page - 1) * limit;
     const totalProducts = await Product.countDocuments({ supplier_id });
-    const products = await Product.find({ supplier_id, active: true }).populate("supplier_id")
-    .skip(skip).limit(limit);
+    const supplier = await User.findById(supplier_id);
+    // Check if the supplier exists
+    if (!supplier) {
+      throw new Error("Supplier not found");
+    }
+    const products = await Product.find({ supplier_id, active: true }).populate("supplier_id").skip(skip).limit(limit);
 
     res.status(200).json({
       products,
+      supplier,
       page,
       totalPages: Math.ceil(totalProducts / limit),
       totalProducts,
@@ -604,6 +611,7 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 const getProductsByEnglishName = asyncHandler(async (req, res) => {
   const { english_name } = req.body; // Assuming user authentication middleware sets this header
 
