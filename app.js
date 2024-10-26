@@ -42,6 +42,12 @@ const __dirname1 = path.resolve();
 app.use(express.static(path.join(__dirname1, "")));
 app.use("/public", express.static("public"));
 app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static("uploads/category"));
+app.use("/uploads", express.static("uploads/fertilizer"));
+app.use("/uploads", express.static("uploads/product"));
+app.use("/uploads", express.static("uploads/profiles"));
+app.use("/uploads", express.static("uploads/subcategory"));
+app.use("/uploads", express.static("uploads/tools"));
 app.use(express.json()); // to accept JSON data
 app.use(cors());
 app.use(

@@ -2874,6 +2874,42 @@ const updatePinCodeToString = asyncHandler(async (req, res) => {
   }
 });
 
+const updateUserRole = asyncHandler(async (req, res, next) => {
+      const userId = req.headers.userID;
+      const  role  = "both";
+
+      if (!role) {
+        return next(new ErrorHandler("Please provide a role to update.", 400));
+      }
+
+      try {
+        // Find and update the user's role in the database
+        const updatedUser = await User.findByIdAndUpdate(
+          userId,
+          { role },
+          { new: true } // Returns the updated document
+        );
+
+        if (!updatedUser) {
+          return next(new ErrorHandler("User not found.", 404));
+        }
+
+        res.status(200).json({
+          message: "User role updated successfully.",
+          user: {
+            _id: updatedUser._id,
+            full_name: updatedUser.full_name,
+            email: updatedUser.email,
+            mobile: updatedUser.mobile,
+            role: updatedUser.role,
+          },
+        });
+      } catch (error) {
+        next(new ErrorHandler("Failed to update user role.", 500));
+      }
+});
+
+
 module.exports = {
   getUsers,
   registerUser,
@@ -2929,4 +2965,5 @@ module.exports = {
   getUserDetails,
   updateNumberToString,
   updatePinCodeToString,
+  updateUserRole
 };
