@@ -580,7 +580,6 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
   const limit = 10; // Number of products per page
 
-
   try {
     if (!supplier_id) {
       return res.status(400).json({
@@ -613,18 +612,18 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
 });
 
 const getProductsByEnglishName = asyncHandler(async (req, res) => {
-  const { english_name } = req.body; // Assuming user authentication middleware sets this header
+  const { supplier_id } = req.body; // Assuming user authentication middleware sets this header
 
   try {
-    if (!english_name) {
+    if (!supplier_id) {
       return res.status(400).json({
         message: "Product name is required.",
         status: false,
       });
     }
-    const products = await Product.find({ english_name: english_name });
+    const supplier = await User.findById(supplier_id);
 
-    res.json({ products, status: true }); // Change 'product' to 'products'
+    res.json({ supplier, status: true }); // Change 'product' to 'products'
   } catch (error) {
     console.error("Error fetching product:", error.message);
     res.status(500).json({ error: "Internal Server Error" });

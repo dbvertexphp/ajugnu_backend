@@ -1755,7 +1755,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
     // Build the query object
     const query = {
-      role: "user",
+      role: { $in: ["user", "both"] },
       $or: [
         ...(searchRegex ? [{ full_name: searchRegex }] : []), // Search by name if regex is valid
         ...(searchRegex ? [{ email: searchRegex }] : []), // Search by email if regex is valid
@@ -1917,8 +1917,9 @@ const updateProfileDataByAdmin = asyncHandler(async (req, res) => {
 
 const getAllDashboardCount = asyncHandler(async (req, res) => {
   try {
-    const teacherCount = await User.countDocuments({ role: "supplier" });
-    const studentCount = await User.countDocuments({ role: "user" });
+    const teacherCount = await User.countDocuments({ role: { $in: ["supplier", "both"] } });
+
+    const studentCount = await User.countDocuments({ role: { $in: ["supplier", "both"] } });
     const courseCount = await Product.countDocuments();
     const adminnotifications = await OrderNotification.countDocuments();
     const transactionAmountSum = await Transaction.aggregate([
@@ -2838,43 +2839,42 @@ const updatePinCodeToString = asyncHandler(async (req, res) => {
 });
 
 const updateUserRole = asyncHandler(async (req, res, next) => {
-      const userId = req.headers.userID;
-      const  role  = "both";
+  const userId = req.headers.userID;
+  const role = "both";
 
-      if (!role) {
-        return next(new ErrorHandler("Please provide a role to update.", 400));
-      }
+  if (!role) {
+    return next(new ErrorHandler("Please provide a role to update.", 400));
+  }
 
-      try {
-        // Find and update the user's role in the database
-        const updatedUser = await User.findByIdAndUpdate(
-          userId,
-          { role },
-          { new: true } // Returns the updated document
-        );
+  try {
+    // Find and update the user's role in the database
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { role },
+      { new: true } // Returns the updated document
+    );
 
-        if (!updatedUser) {
-          return next(new ErrorHandler("User not found.", 404));
-        }
+    if (!updatedUser) {
+      return next(new ErrorHandler("User not found.", 404));
+    }
 
-        const token = jwt.sign({ _id: updatedUser._id, role: updatedUser.role }, process.env.JWT_SECRET);
+    const token = jwt.sign({ _id: updatedUser._id, role: updatedUser.role }, process.env.JWT_SECRET);
 
-        res.status(200).json({
-          message: "User role updated successfully.",
-          user: {
-            _id: updatedUser._id,
-            full_name: updatedUser.full_name,
-            email: updatedUser.email,
-            mobile: updatedUser.mobile,
-            role: updatedUser.role,
-            token,
-          },
-        });
-      } catch (error) {
-        next(new ErrorHandler("Failed to update user role.", 500));
-      }
+    res.status(200).json({
+      message: "User role updated successfully.",
+      user: {
+        _id: updatedUser._id,
+        full_name: updatedUser.full_name,
+        email: updatedUser.email,
+        mobile: updatedUser.mobile,
+        role: updatedUser.role,
+        token,
+      },
+    });
+  } catch (error) {
+    next(new ErrorHandler("Failed to update user role.", 500));
+  }
 });
-
 
 module.exports = {
   getUsers,
@@ -2931,5 +2931,5 @@ module.exports = {
   getUserDetails,
   updateNumberToString,
   updatePinCodeToString,
-  updateUserRole
+  updateUserRole,
 };
