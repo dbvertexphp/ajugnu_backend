@@ -57,7 +57,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
 
-      - run: npm ci
+      - run: npm ci --force
       - run: npm update --force
 
       # Step 6: Restart the application
