@@ -72,7 +72,7 @@ const NotificationListAdmin = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error("Error getting notification list:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: "Internal server Error" });
   }
 });
 
