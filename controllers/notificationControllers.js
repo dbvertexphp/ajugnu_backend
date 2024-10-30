@@ -11,7 +11,7 @@ admin.initializeApp({
 
 const sendFCMNotification = async (registrationToken, title, body) => {
   const message = {
-    notification: {
+    data: {
       title,
       body,
     },
