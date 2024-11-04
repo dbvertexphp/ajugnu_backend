@@ -613,6 +613,7 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
 
 const getProductsByEnglishName = asyncHandler(async (req, res) => {
   const { supplier_id } = req.body; // Assuming user authentication middleware sets this header
+  console.log(supplier_id);
 
   try {
     if (!supplier_id) {
