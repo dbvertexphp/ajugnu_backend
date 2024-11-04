@@ -695,7 +695,7 @@ const ChangePassword = asyncHandler(async (req, res, next) => {
 
 const getAllSupplier = asyncHandler(async (req, res) => {
   try {
-    const supplier = await User.find({ role: "supplier" }).select("full_name _id");
+    const supplier = await User.find({ role: { $in: ["supplier", "both"] }, }).select("full_name _id");
 
     if (!supplier) {
       return res.status(200).json({
@@ -736,11 +736,13 @@ const getProductByCategory_id = asyncHandler(async (req, res) => {
 
     // Find all suppliers whose pin codes match the user's pin code
     const matchingSuppliers = await User.find({
-      role: "supplier",
+      role: { $in: ["supplier", "both"] },
       pin_code: { $in: userPinCode },
     }).select("_id");
 
     const supplierIds = matchingSuppliers.map((supplier) => supplier._id);
+    console.log(userPinCode);
+
 
     // Fetch products by category_id
     const products = await Product.find({ category_id, active: true, supplier_id: { $in: supplierIds } }).populate("");

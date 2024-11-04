@@ -869,7 +869,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
 
     // Find all suppliers whose pin codes match the user's pin code
     const matchingSuppliers = await User.find({
-      role: "supplier",
+      role: { $in: ["supplier", "both"] },
       pin_code: { $in: userPinCode },
     }).select("_id");
 
