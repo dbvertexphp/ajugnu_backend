@@ -54,7 +54,8 @@ const {
   getUserDetails,
   updateNumberToString,
   updatePinCodeToString,
-  updateUserRole
+  updateUserRole,
+  updateCancelOrder
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -99,6 +100,8 @@ userRoutes.route("/getPopularProduct").get(protect, Authorization(["user","both"
 userRoutes.route("/updateUserPincode").post(protect, Authorization(["user","both"]), updateUserPincode);
 userRoutes.route("/getProductsRendom").get(protect, Authorization(["user","both","admin"]), getProductsRendom);
 userRoutes.route("/updateUserRole").post(protect, Authorization(["user","both","supplier"]), updateUserRole);
+userRoutes.route("/updateCancelOrder").post(protect, Authorization(["user"]), updateCancelOrder);
+
 
 userRoutes.route("/getCoursesByUserId").get(protect, Authorization(["student"]), getCoursesByUserId);
 userRoutes.route("/getAllUsers").get(protect, Authorization(["student", "admin"]), getAllUsers);
