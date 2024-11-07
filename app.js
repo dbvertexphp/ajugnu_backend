@@ -48,6 +48,7 @@ app.use("/uploads", express.static("uploads/product"));
 app.use("/uploads", express.static("uploads/profiles"));
 app.use("/uploads", express.static("uploads/subcategory"));
 app.use("/uploads", express.static("uploads/tools"));
+app.use("/uploads", express.static("uploads/notification"));
 app.use(express.json()); // to accept JSON data
 app.use(cors());
 app.use(

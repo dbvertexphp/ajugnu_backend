@@ -1756,7 +1756,8 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
     // Build the query object
     const query = {
-      role: { $in: ["user", "both"] },
+      // role: { $in: ["user", "both"] },
+      role: "user",
       $or: [
         ...(searchRegex ? [{ full_name: searchRegex }] : []), // Search by name if regex is valid
         ...(searchRegex ? [{ email: searchRegex }] : []), // Search by email if regex is valid
@@ -1817,7 +1818,7 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
 
     // Construct the query to search by full_name, email, or mobile and filter by role 'supplier'
     let query = {
-      role: { $in: ["supplier", "both"] },
+      role: "supplier",
     };
 
     // Add $or condition only if there is a search term
@@ -1846,6 +1847,62 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
     });
   }
 });
+
+const getAllBothUsers = asyncHandler(async (req, res) => {
+      try {
+        const { page = 1, limit = 10, search = "" } = req.query;
+        const skip = (page - 1) * limit;
+        const searchRegex = search ? new RegExp(search, "i") : null;
+
+        // Convert search to a number if it is numeric
+        const mobileSearch = isNaN(search) ? null : new RegExp(search);
+        const pincodeSearch = isNaN(search) ? null : new RegExp(search);
+
+        // Build the query object
+        const query = {
+          // role: { $in: ["user", "both"] },
+          role: "both",
+          $or: [
+            ...(searchRegex ? [{ full_name: searchRegex }] : []), // Search by name if regex is valid
+            ...(searchRegex ? [{ email: searchRegex }] : []), // Search by email if regex is valid
+            ...(mobileSearch ? [{ mobile: mobileSearch }] : []), // Search by mobile if valid
+            ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : []), // Search by pincode if valid
+          ],
+        };
+
+        const users = await User.find(query).skip(skip).limit(Number(limit));
+
+        // Get total count of users matching the role and search criteria
+        const totalUsers = await User.countDocuments(query);
+
+        const transformedUsersPromises = users.map(async (user) => {
+          let transformedUser = { ...user.toObject() };
+          if (transformedUser.pic) {
+            const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
+            transformedUser.pic = getSignedUrl_pic;
+          }
+          if (transformedUser.watch_time) {
+            transformedUser.watch_time = convertSecondsToReadableTimeAdmin(transformedUser.watch_time);
+          }
+          return { user: transformedUser };
+        });
+
+        const transformedUsers = await Promise.all(transformedUsersPromises);
+
+        res.json({
+          Users: transformedUsers,
+          total_rows: totalUsers,
+          totalPages: Math.ceil(totalUsers / limit),
+          currentPage: Number(page),
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({
+          message: "Internal Server Error",
+          status: false,
+        });
+      }
+    });
 
 const searchUsers = asyncHandler(async (req, res) => {
   const { page = 1, name = "" } = req.body;
@@ -1918,10 +1975,10 @@ const updateProfileDataByAdmin = asyncHandler(async (req, res) => {
 
 const getAllDashboardCount = asyncHandler(async (req, res) => {
   try {
-    const teacherCount = await User.countDocuments({ role: { $in: ["supplier", "both"] } });
-
-    const studentCount = await User.countDocuments({ role: { $in: ["supplier", "both"] } });
-    const courseCount = await Product.countDocuments();
+    const supplierCount = await User.countDocuments({ role: { $in: "supplier" } });
+    const userCount = await User.countDocuments({ role: { $in: "user" } });
+    const bothCount = await User.countDocuments({ role: { $in: "both" } });
+    const productCount = await Product.countDocuments();
     const adminnotifications = await OrderNotification.countDocuments();
     const transactionAmountSum = await Transaction.aggregate([
       {
@@ -1936,9 +1993,10 @@ const getAllDashboardCount = asyncHandler(async (req, res) => {
     const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].total_amount : 0;
 
     res.status(200).json({
-      teacherCount: teacherCount,
-      studentCount: studentCount,
-      courseCount: courseCount,
+      supplierCount: supplierCount,
+      userCount: userCount,
+      productCount: productCount,
+      bothCount: bothCount,
       adminnotifications: adminnotifications,
       transactionTotalAmount: transactionTotalAmount,
     });
@@ -2878,126 +2936,177 @@ const updateUserRole = asyncHandler(async (req, res, next) => {
 });
 
 const updateCancelOrder = asyncHandler(async (req, res) => {
-      const { order_id, new_status } = req.body;
-      const user_id = req.headers.userID;
+  const { order_id, new_status } = req.body;
+  const user_id = req.headers.userID;
 
-      try {
-        // Validate input
-        if (!order_id || !new_status) {
-          return res.status(400).json({ message: "order_id and new_status are required", status: false });
-        }
+  try {
+    // Validate input
+    if (!order_id || !new_status) {
+      return res.status(400).json({ message: "order_id and new_status are required", status: false });
+    }
 
-        // Validate new_status
-        const validStatuses = ["cancelled"];
-        if (!validStatuses.includes(new_status)) {
-          return res.status(400).json({ message: "Invalid status", status: false });
-        }
+    // Validate new_status
+    const validStatuses = ["cancelled"];
+    if (!validStatuses.includes(new_status)) {
+      return res.status(400).json({ message: "Invalid status", status: false });
+    }
 
-        // Update all items with status "order" to "cancelled"
-        const savedOrder = await Order.findOneAndUpdate(
-          {
-            _id: order_id,
-            user_id: user_id,
-            "items.status": "order", // Ensure there is at least one item with status "order"
-          },
-          {
-            $set: {
-              "items.$[elem].status": new_status,
-              updated_at: Date.now(),
-            },
-          },
-          {
-            new: true,
-            arrayFilters: [{ "elem.status": "order" }], // Apply filter to update all "order" status items
-          }
-        );
-
-        if (!savedOrder) {
-          return res.status(400).json({ message: `Your order cannot be cancelled`, status: false });
-        }
-
-        // Filter items to include only those with the updated status
-        const filteredItems = savedOrder.items.filter((item) => item.status === new_status);
-
-        // Send notification to user
-        const user = await User.findById(user_id);
-        if (user && (user.firebase_token || user.firebase_token === "dummy_token")) {
-          const userTitle = "Order Status";
-          const userBody = "Your order has been cancelled.";
-          const notificationResult = await sendFCMNotification(user.firebase_token, userTitle, userBody);
-          if (notificationResult.success) {
-            console.log("Notification sent successfully:", notificationResult.response);
-          } else {
-            console.error("Failed to send notification:", notificationResult.error);
-          }
-          await addNotification(user_id, order_id, userBody, savedOrder.total_amount, null, userTitle, new_status);
-
-          // Refactored send email function for user
-          const sendEmailAsync = async () => {
-            const subject = "Order Cancellation Notification";
-            const text = `Hello ${user.full_name},\n\nYour order (ID: ${savedOrder.order_id}) has been cancelled successfully.\n\nThank you.`;
-
-            try {
-              await sendEmail(user.email, subject, text); // Send email after user registration
-              console.log(`Email sent successfully to ${user.email}: ${subject}`);
-            } catch (error) {
-              console.error("Failed to send email notification:", error);
-            }
-          };
-
-          // Ensure email is sent asynchronously
-          await sendEmailAsync();
-        }
-
-        // Send notification to each supplier
-        const supplierIds = Array.from(new Set(filteredItems.map((item) => item.supplier_id))); // Get unique supplier IDs
-        for (const supplier_id of supplierIds) {
-          const supplier = await User.findById(supplier_id);
-
-          if (supplier && (supplier.firebase_token || supplier.firebase_token === "dummy_token")) {
-            const supplierTitle = "Order Cancellation Notification";
-            const supplierBody = `Order has been cancelled by the ${user.full_name}.Order(Id: ${savedOrder.order_id})`;
-            const notificationResult = await sendFCMNotification(supplier.firebase_token, supplierTitle, supplierBody);
-            if (notificationResult.success) {
-              console.log("Notification sent successfully:", notificationResult.response);
-            } else {
-              console.error("Failed to send notification:", notificationResult.error);
-            }
-            await addNotification(null, order_id, supplierBody, savedOrder.total_amount, [supplier_id], supplierTitle, new_status);
-
-            // Refactored send email function for supplier
-            const sendSupplierEmailAsync = async () => {
-              const subject = "Order Cancellation Notification";
-              const text = `Hello ${supplier.full_name},\n\nOrder (ID: ${savedOrder.order_id}) has been cancelled by the ${user.full_name}.\n\n.`;
-
-              try {
-                await sendEmail(supplier.email, subject, text); // Send email to supplier
-                console.log(`Email sent successfully to ${supplier.email}: ${subject}`);
-              } catch (error) {
-                console.error("Failed to send email notification:", error);
-              }
-            };
-
-            // Ensure email is sent asynchronously
-            await sendSupplierEmailAsync();
-          }
-        }
-
-        res.status(200).json({
-          status: true,
-          message: "Order items status updated to 'cancelled' successfully",
-          order: {
-            ...savedOrder.toObject(),
-            items: filteredItems, // Include only the filtered items in the response
-          },
-        });
-      } catch (error) {
-        console.error("Error updating order items status:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+    // Update all items with status "order" to "cancelled"
+    const savedOrder = await Order.findOneAndUpdate(
+      {
+        _id: order_id,
+        user_id: user_id,
+        "items.status": "order", // Ensure there is at least one item with status "order"
+      },
+      {
+        $set: {
+          "items.$[elem].status": new_status,
+          updated_at: Date.now(),
+        },
+      },
+      {
+        new: true,
+        arrayFilters: [{ "elem.status": "order" }], // Apply filter to update all "order" status items
       }
+    );
+
+    if (!savedOrder) {
+      return res.status(400).json({ message: `Your order cannot be cancelled`, status: false });
+    }
+
+    // Filter items to include only those with the updated status
+    const filteredItems = savedOrder.items.filter((item) => item.status === new_status);
+
+    // Send notification to user
+    const user = await User.findById(user_id);
+    if (user && (user.firebase_token || user.firebase_token === "dummy_token")) {
+      const userTitle = "Order Status";
+      const userBody = "Your order has been cancelled.";
+      const notificationResult = await sendFCMNotification(user.firebase_token, userTitle, userBody);
+      if (notificationResult.success) {
+        console.log("Notification sent successfully:", notificationResult.response);
+      } else {
+        console.error("Failed to send notification:", notificationResult.error);
+      }
+      await addNotification(user_id, order_id, userBody, savedOrder.total_amount, null, userTitle, new_status);
+
+      // Refactored send email function for user
+      const sendEmailAsync = async () => {
+        const subject = "Order Cancellation Notification";
+        const text = `Hello ${user.full_name},\n\nYour order (ID: ${savedOrder.order_id}) has been cancelled successfully.\n\nThank you.`;
+
+        try {
+          await sendEmail(user.email, subject, text); // Send email after user registration
+          console.log(`Email sent successfully to ${user.email}: ${subject}`);
+        } catch (error) {
+          console.error("Failed to send email notification:", error);
+        }
+      };
+
+      // Ensure email is sent asynchronously
+      await sendEmailAsync();
+    }
+
+    // Send notification to each supplier
+    const supplierIds = Array.from(new Set(filteredItems.map((item) => item.supplier_id))); // Get unique supplier IDs
+    for (const supplier_id of supplierIds) {
+      const supplier = await User.findById(supplier_id);
+
+      if (supplier && (supplier.firebase_token || supplier.firebase_token === "dummy_token")) {
+        const supplierTitle = "Order Cancellation Notification";
+        const supplierBody = `Order has been cancelled by the ${user.full_name}.Order(Id: ${savedOrder.order_id})`;
+        const notificationResult = await sendFCMNotification(supplier.firebase_token, supplierTitle, supplierBody);
+        if (notificationResult.success) {
+          console.log("Notification sent successfully:", notificationResult.response);
+        } else {
+          console.error("Failed to send notification:", notificationResult.error);
+        }
+        await addNotification(null, order_id, supplierBody, savedOrder.total_amount, [supplier_id], supplierTitle, new_status);
+
+        // Refactored send email function for supplier
+        const sendSupplierEmailAsync = async () => {
+          const subject = "Order Cancellation Notification";
+          const text = `Hello ${supplier.full_name},\n\nOrder (ID: ${savedOrder.order_id}) has been cancelled by the ${user.full_name}.\n\n.`;
+
+          try {
+            await sendEmail(supplier.email, subject, text); // Send email to supplier
+            console.log(`Email sent successfully to ${supplier.email}: ${subject}`);
+          } catch (error) {
+            console.error("Failed to send email notification:", error);
+          }
+        };
+
+        // Ensure email is sent asynchronously
+        await sendSupplierEmailAsync();
+      }
+    }
+
+    res.status(200).json({
+      status: true,
+      message: "Order items status updated to 'cancelled' successfully",
+      order: {
+        ...savedOrder.toObject(),
+        items: filteredItems, // Include only the filtered items in the response
+      },
     });
+  } catch (error) {
+    console.error("Error updating order items status:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
+const sendNotificationToRole = asyncHandler(async (req, res) => {
+  req.uploadPath = "uploads/notification";
+  upload.single("image")(req, res, async (err) => {
+    if (err) {
+      return next(new ErrorHandler(err.message, 400));
+    }
+    const { body, title, role } = req.body;
 
+    if (!body || !title || !role) {
+      return res.status(400).json({ message: "Invalid input", status: false });
+    }
+
+    const image = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
+
+    try {
+      // Find all users with the specified role
+      const users = await User.find({ role });
+
+      if (users.length === 0) {
+        return res.status(404).json({ message: "No users with the specified role found", status: false });
+      }
+
+      // Loop through each user and send notification if they have a firebase_token
+      for (const user of users) {
+        if (user.firebase_token) {
+          const registrationToken = user.firebase_token;
+          const notificationResult = await sendFCMNotification(registrationToken, title, body, image);
+
+          if (notificationResult.success) {
+            console.log(`Notification sent successfully to ${user._id}:`, notificationResult.response);
+          } else {
+            console.error(`Failed to send notification to ${user._id}:`, notificationResult.error);
+          }
+        }
+
+        // Determine notification parameters based on role
+        if (role === "user") {
+          await addNotification(user._id, null, body, null, null, title, null);
+        } else if (role === "supplier") {
+          await addNotification(null, null, body, null, [user._id], title, null);
+        } else if (role === "both") {
+          await addNotification(user._id, null, body, null, [user._id], title, null);
+        }
+      }
+
+      res.status(200).json({ message: "Notifications sent successfully", status: true });
+    } catch (error) {
+      console.error("Error sending notifications:", error.message);
+      res.status(500).json({ message: "Internal Server Error", status: false });
+    }
+  });
+});
 
 module.exports = {
   getUsers,
@@ -3056,4 +3165,6 @@ module.exports = {
   updatePinCodeToString,
   updateUserRole,
   updateCancelOrder,
+  sendNotificationToRole,
+  getAllBothUsers
 };

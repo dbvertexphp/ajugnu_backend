@@ -9,21 +9,24 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-const sendFCMNotification = async (registrationToken, title, body) => {
-  const message = {
-    data: {
-      title,
-      body,
-    },
-    token: registrationToken,
-  };
-  try {
-    const response = await admin.messaging().send(message);
-    return { success: true, response };
-  } catch (error) {
-    return { success: false, error };
-  }
+const sendFCMNotification = async (registrationToken, title, body, image = null) => {
+      const message = {
+        notification: {
+          title,
+          body,
+          image: image || undefined, // Only include image if it's provided
+        },
+        token: registrationToken,
+      };
+
+      try {
+        const response = await admin.messaging().send(message);
+        return { success: true, response };
+      } catch (error) {
+        return { success: false, error };
+      }
 };
+
 
 const createNotification = async (sender_id, receiver_id, message, type, data = null) => {
   try {

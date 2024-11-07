@@ -55,7 +55,9 @@ const {
   updateNumberToString,
   updatePinCodeToString,
   updateUserRole,
-  updateCancelOrder
+  updateCancelOrder,
+  sendNotificationToRole,
+  getAllBothUsers
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -101,10 +103,12 @@ userRoutes.route("/updateUserPincode").post(protect, Authorization(["user","both
 userRoutes.route("/getProductsRendom").get(protect, Authorization(["user","both","admin"]), getProductsRendom);
 userRoutes.route("/updateUserRole").post(protect, Authorization(["user","both","supplier"]), updateUserRole);
 userRoutes.route("/updateCancelOrder").post(protect, Authorization(["user","both"]), updateCancelOrder);
+userRoutes.route("/sendNotificationToRole").post(protect, Authorization(["admin"]), sendNotificationToRole);
 
 
 userRoutes.route("/getCoursesByUserId").get(protect, Authorization(["student"]), getCoursesByUserId);
 userRoutes.route("/getAllUsers").get(protect, Authorization(["student", "admin"]), getAllUsers);
+userRoutes.route("/getAllBothUsers").get(protect, Authorization(["admin"]), getAllBothUsers);
 userRoutes.route("/getFavoriteTeachers").get(protect, Authorization(["student"]), getFavoriteTeachers);
 userRoutes.route("/getRatingsByTeacherId/:teacherId").get(protect, getRatingsByTeacherId);
 userRoutes.route("/addReview").post(protect, Authorization(["student"]), addReview);

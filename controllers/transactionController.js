@@ -301,7 +301,7 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
     const searchQuery = search
       ? {
           $or: [
-            { user_name: { $regex: search, $options: "i" } }, // Searching by user ID
+            { user_name: { $regex: search, $options: "i" } },
           ],
         }
       : {};
@@ -312,9 +312,6 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
       .populate("user_id order_id items.product_id items.supplier_id");
-
-      console.log(transactions);
-
 
     // Count total number of transactions matching the search query
     const totalTransactions = await Transaction.countDocuments(searchQuery);
