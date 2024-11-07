@@ -9,12 +9,12 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-const sendFCMNotification = async (registrationToken, title, body, image = null) => {
+const sendFCMNotification = async (registrationToken, title, body, imageUrl = null) => {
       const message = {
         notification: {
           title,
           body,
-          image: image || undefined, // Only include image if it's provided
+          imageUrl: imageUrl || undefined, // Only include image if it's provided
         },
         token: registrationToken,
       };

@@ -3067,7 +3067,7 @@ const sendNotificationToRole = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Invalid input", status: false });
     }
 
-    const image = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
+    const imageUrl = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
 
     try {
       // Find all users with the specified role
@@ -3081,7 +3081,7 @@ const sendNotificationToRole = asyncHandler(async (req, res) => {
       for (const user of users) {
         if (user.firebase_token) {
           const registrationToken = user.firebase_token;
-          const notificationResult = await sendFCMNotification(registrationToken, title, body, image);
+          const notificationResult = await sendFCMNotification(registrationToken, title, body, imageUrl);
 
           if (notificationResult.success) {
             console.log(`Notification sent successfully to ${user._id}:`, notificationResult.response);
