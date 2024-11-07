@@ -100,7 +100,7 @@ userRoutes.route("/getPopularProduct").get(protect, Authorization(["user","both"
 userRoutes.route("/updateUserPincode").post(protect, Authorization(["user","both"]), updateUserPincode);
 userRoutes.route("/getProductsRendom").get(protect, Authorization(["user","both","admin"]), getProductsRendom);
 userRoutes.route("/updateUserRole").post(protect, Authorization(["user","both","supplier"]), updateUserRole);
-userRoutes.route("/updateCancelOrder").post(protect, Authorization(["user"]), updateCancelOrder);
+userRoutes.route("/updateCancelOrder").post(protect, Authorization(["user","both"]), updateCancelOrder);
 
 
 userRoutes.route("/getCoursesByUserId").get(protect, Authorization(["student"]), getCoursesByUserId);
