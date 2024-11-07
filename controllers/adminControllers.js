@@ -113,7 +113,7 @@ const NotificationTimer = (databaseTime) => {
     // Return the time difference string
     return timeDifference.trim() === "" ? "Just now" : timeDifference.trim();
   } catch (error) {
-    console.error("Error calculating time difference:", error.message);
+    console.error("Error calculating time Difference:", error.message);
     return "Invalid time format";
   }
 };
