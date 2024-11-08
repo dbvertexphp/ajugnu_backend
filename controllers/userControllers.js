@@ -1849,60 +1849,60 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
 });
 
 const getAllBothUsers = asyncHandler(async (req, res) => {
-      try {
-        const { page = 1, limit = 10, search = "" } = req.query;
-        const skip = (page - 1) * limit;
-        const searchRegex = search ? new RegExp(search, "i") : null;
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+    const skip = (page - 1) * limit;
+    const searchRegex = search ? new RegExp(search, "i") : null;
 
-        // Convert search to a number if it is numeric
-        const mobileSearch = isNaN(search) ? null : new RegExp(search);
-        const pincodeSearch = isNaN(search) ? null : new RegExp(search);
+    // Convert search to a number if it is numeric
+    const mobileSearch = isNaN(search) ? null : new RegExp(search);
+    const pincodeSearch = isNaN(search) ? null : new RegExp(search);
 
-        // Build the query object
-        const query = {
-          // role: { $in: ["user", "both"] },
-          role: "both",
-          $or: [
-            ...(searchRegex ? [{ full_name: searchRegex }] : []), // Search by name if regex is valid
-            ...(searchRegex ? [{ email: searchRegex }] : []), // Search by email if regex is valid
-            ...(mobileSearch ? [{ mobile: mobileSearch }] : []), // Search by mobile if valid
-            ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : []), // Search by pincode if valid
-          ],
-        };
+    // Build the query object
+    const query = {
+      // role: { $in: ["user", "both"] },
+      role: "both",
+      $or: [
+        ...(searchRegex ? [{ full_name: searchRegex }] : []), // Search by name if regex is valid
+        ...(searchRegex ? [{ email: searchRegex }] : []), // Search by email if regex is valid
+        ...(mobileSearch ? [{ mobile: mobileSearch }] : []), // Search by mobile if valid
+        ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : []), // Search by pincode if valid
+      ],
+    };
 
-        const users = await User.find(query).skip(skip).limit(Number(limit));
+    const users = await User.find(query).skip(skip).limit(Number(limit));
 
-        // Get total count of users matching the role and search criteria
-        const totalUsers = await User.countDocuments(query);
+    // Get total count of users matching the role and search criteria
+    const totalUsers = await User.countDocuments(query);
 
-        const transformedUsersPromises = users.map(async (user) => {
-          let transformedUser = { ...user.toObject() };
-          if (transformedUser.pic) {
-            const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
-            transformedUser.pic = getSignedUrl_pic;
-          }
-          if (transformedUser.watch_time) {
-            transformedUser.watch_time = convertSecondsToReadableTimeAdmin(transformedUser.watch_time);
-          }
-          return { user: transformedUser };
-        });
-
-        const transformedUsers = await Promise.all(transformedUsersPromises);
-
-        res.json({
-          Users: transformedUsers,
-          total_rows: totalUsers,
-          totalPages: Math.ceil(totalUsers / limit),
-          currentPage: Number(page),
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({
-          message: "Internal Server Error",
-          status: false,
-        });
+    const transformedUsersPromises = users.map(async (user) => {
+      let transformedUser = { ...user.toObject() };
+      if (transformedUser.pic) {
+        const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
+        transformedUser.pic = getSignedUrl_pic;
       }
+      if (transformedUser.watch_time) {
+        transformedUser.watch_time = convertSecondsToReadableTimeAdmin(transformedUser.watch_time);
+      }
+      return { user: transformedUser };
     });
+
+    const transformedUsers = await Promise.all(transformedUsersPromises);
+
+    res.json({
+      Users: transformedUsers,
+      total_rows: totalUsers,
+      totalPages: Math.ceil(totalUsers / limit),
+      currentPage: Number(page),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      status: false,
+    });
+  }
+});
 
 const searchUsers = asyncHandler(async (req, res) => {
   const { page = 1, name = "" } = req.body;
@@ -3081,7 +3081,7 @@ const sendNotificationToRole = asyncHandler(async (req, res) => {
       for (const user of users) {
         if (user.firebase_token) {
           const registrationToken = user.firebase_token;
-          const notificationResult = await sendFCMNotification(registrationToken, title, body, imageUrl);
+          const notificationResult = await sendFCMNotification(registrationToken, title, body);
 
           if (notificationResult.success) {
             console.log(`Notification sent successfully to ${user._id}:`, notificationResult.response);
@@ -3166,5 +3166,5 @@ module.exports = {
   updateUserRole,
   updateCancelOrder,
   sendNotificationToRole,
-  getAllBothUsers
+  getAllBothUsers,
 };
