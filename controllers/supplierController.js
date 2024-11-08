@@ -872,6 +872,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
     const matchingSuppliers = await User.find({
       role: { $in: ["supplier", "both"] },
       pin_code: { $in: userPinCode },
+      _id: { $ne: userID },
     }).select("_id");
 
     const supplierIds = matchingSuppliers.map((supplier) => supplier._id);

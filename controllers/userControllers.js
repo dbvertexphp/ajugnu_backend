@@ -938,59 +938,80 @@ const getFavoriteProduct = asyncHandler(async (req, res) => {
 
 // Define the addToCart function
 const addToCart = asyncHandler(async (req, res) => {
-  const { product_id, quantity } = req.body;
-  const userID = req.headers.userID;
+      const { product_id, quantity } = req.body;
+      const userID = req.headers.userID;
 
-  try {
-    // Validate product_id, quantity, and userID
-    if (!product_id) {
-      return res.status(400).json({ message: "Product ID is required", status: false });
-    }
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ message: "Quantity should be a positive number", status: false });
-    }
-    if (!userID) {
-      return res.status(400).json({ message: "User ID is required", status: false });
-    }
+      try {
+        // Validate product_id, quantity, and userID
+        if (!product_id) {
+          return res.status(400).json({ message: "Product ID is required", status: false });
+        }
+        if (!quantity || quantity <= 0) {
+          return res.status(400).json({ message: "Quantity should be a positive number", status: false });
+        }
+        if (!userID) {
+          return res.status(400).json({ message: "User ID is required", status: false });
+        }
 
-    // Check if the product exists
-    const product = await Product.findById(product_id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found", status: false });
-    }
-    // Check if the requested quantity exceeds available stock
-    if (quantity > product.quantity) {
-      return res.status(400).json({ message: "Requested quantity exceeds available stock", status: false });
-    }
+        // Find the user and check if they exist
+        const user = await User.findById(userID);
+        if (!user) {
+          return res.status(404).json({ message: "User not found", status: false });
+        }
 
-    // Check if the product is already in the cart
-    let cartItem = await Cart.findOne({ user_id: userID, product_id: product_id });
-    if (cartItem) {
-      // Update the quantity of the existing cart item
-      cartItem.quantity += quantity;
-    } else {
-      // Create a new cart item
-      cartItem = new Cart({
-        user_id: userID,
-        product_id: product_id,
-        quantity: quantity,
-        supplier_id: product.supplier_id,
-      });
-    }
+        // Check if the product exists and populate supplier information
+        const product = await Product.findById(product_id).populate({
+          path: 'supplier_id',
+          model: 'User',
+        });
+        if (!product) {
+          return res.status(404).json({ message: "Product not found", status: false });
+        }
 
-    // Save the cart item
-    await cartItem.save();
+        // Ensure there is a supplier and pin codes to check
+        if (!product.supplier_id || !product.supplier_id.pin_code || !user.pin_code) {
+          return res.status(400).json({ message: "Supplier or User pin codes are missing", status: false });
+        }
 
-    // Return success response
-    res.status(201).json({
-      status: true,
-      message: "Product added to cart successfully",
-      cartItem,
-    });
-  } catch (error) {
-    console.error("Error adding product to cart:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+        // Check if any user pin code matches any supplier pin code
+        const isPinCodeMatch = user.pin_code.some(pin => product.supplier_id.pin_code.includes(pin));
+        if (!isPinCodeMatch) {
+          return res.status(400).json({ message: "User's location is not eligible for this supplier's product", status: false });
+        }
+
+        // Check if the requested quantity exceeds available stock
+        if (quantity > product.quantity) {
+          return res.status(400).json({ message: "Requested quantity exceeds available stock", status: false });
+        }
+
+        // Check if the product is already in the cart
+        let cartItem = await Cart.findOne({ user_id: userID, product_id: product_id });
+        if (cartItem) {
+          // Update the quantity of the existing cart item
+          cartItem.quantity += quantity;
+        } else {
+          // Create a new cart item
+          cartItem = new Cart({
+            user_id: userID,
+            product_id: product_id,
+            quantity: quantity,
+            supplier_id: product.supplier_id,
+          });
+        }
+
+        // Save the cart item
+        await cartItem.save();
+
+        // Return success response
+        res.status(201).json({
+          status: true,
+          message: "Product added to cart successfully",
+          cartItem,
+        });
+      } catch (error) {
+        console.error("Error adding product to cart:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
 });
 
 const removeFromCart = asyncHandler(async (req, res) => {
@@ -1978,8 +1999,11 @@ const getAllDashboardCount = asyncHandler(async (req, res) => {
     const supplierCount = await User.countDocuments({ role: { $in: "supplier" } });
     const userCount = await User.countDocuments({ role: { $in: "user" } });
     const bothCount = await User.countDocuments({ role: { $in: "both" } });
-    const productCount = await Product.countDocuments();
+    const productCount = await Product.countDocuments({ product_role: "supplier" });
+    const fertilizerCount = await Product.countDocuments({ product_role: "fertilizer" });
+    const toolCount = await Product.countDocuments({ product_role: "tools" });
     const adminnotifications = await OrderNotification.countDocuments();
+    const orderCount = await Order.countDocuments();
     const transactionAmountSum = await Transaction.aggregate([
       {
         $group: {
@@ -1996,7 +2020,10 @@ const getAllDashboardCount = asyncHandler(async (req, res) => {
       supplierCount: supplierCount,
       userCount: userCount,
       productCount: productCount,
+      fertilizerCount: fertilizerCount,
+      toolCount: toolCount,
       bothCount: bothCount,
+      orderCount: orderCount,
       adminnotifications: adminnotifications,
       transactionTotalAmount: transactionTotalAmount,
     });
@@ -3067,7 +3094,7 @@ const sendNotificationToRole = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Invalid input", status: false });
     }
 
-    const imageUrl = req.file ? `${req.uploadPath}/${req.file.filename}` : null;
+    const imageUrl = req.file ? `${process.env.BASE_URL}/${req.uploadPath}/${req.file.filename}` : null;
 
     try {
       // Find all users with the specified role
@@ -3081,7 +3108,7 @@ const sendNotificationToRole = asyncHandler(async (req, res) => {
       for (const user of users) {
         if (user.firebase_token) {
           const registrationToken = user.firebase_token;
-          const notificationResult = await sendFCMNotification(registrationToken, title, body);
+          const notificationResult = await sendFCMNotification(registrationToken, title, body , imageUrl);
 
           if (notificationResult.success) {
             console.log(`Notification sent successfully to ${user._id}:`, notificationResult.response);
