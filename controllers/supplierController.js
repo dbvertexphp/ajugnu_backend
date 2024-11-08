@@ -934,6 +934,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
 
 const getSimilarProducts = asyncHandler(async (req, res) => {
   const { productId } = req.body; // Assuming product ID is passed as a route parameter
+  const userID = req.headers.userID;
 
   try {
     // Fetch the product details based on the provided productId
@@ -941,6 +942,11 @@ const getSimilarProducts = asyncHandler(async (req, res) => {
 
     if (!product) {
       return res.status(404).json({ message: "Product not found", status: false });
+    }
+
+    // Check if the product's supplier is the same as the user
+    if (product.supplier_id._id.toString() === userID) {
+      return res.status(400).json({ message: "You cannot view your own product", status: false });
     }
 
     // Find similar products based on category, product type, and size
