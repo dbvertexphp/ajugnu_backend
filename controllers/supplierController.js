@@ -772,6 +772,18 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Invalid status", status: false });
     }
 
+    // Find the order
+    const order = await Order.findById(order_id);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found", status: false });
+    }
+
+    // Check if any item has already been cancelled
+    const itemToUpdate = order.items.find(item => item.supplier_id.toString() === supplier_id);
+    if (itemToUpdate && itemToUpdate.status === "cancelled") {
+      return res.status(400).json({ message: "Cannot update the status of a cancelled item", status: false });
+    }
+
     // Find and update the order item
     const savedOrder = await Order.findOneAndUpdate(
       { _id: order_id, "items.supplier_id": supplier_id },
