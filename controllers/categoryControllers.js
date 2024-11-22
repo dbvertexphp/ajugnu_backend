@@ -22,10 +22,14 @@ const Createcategory = asyncHandler(async (req, res) => {
       throw new ErrorHandler("Please enter all the required fields.", 400);
     }
 
-    // Check if the category already exists by name
-    const existingCategory = await Category.find({ category_name: category_name }); // Case insensitive check
+    const existingCategory = await Category.findOne({
+      category_name: { $regex: `^${category_name}$`, $options: "i" },
+    });
+
+    console.log("Existing Category:", existingCategory); // Debugging
+
     if (existingCategory) {
-      return res.status(400).json({ message: "Category with this name already exists.", status: false });
+      return res.status(400).json({ message: "Category with this name already exists." });
     }
 
     // Get the file path and normalize it to use forward slashes
