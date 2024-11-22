@@ -210,15 +210,20 @@ const GetSingleCategoryByName = asyncHandler(async (req, res) => {
 });
 
 const GetAllCategoriesAdminpage = asyncHandler(async (req, res, next) => {
-  const { page = 1 } = req.body;
+  const { page = 1, search = "" } = req.body;
   const perPage = 5; // Number of documents to display per page
 
   // Calculate the number of documents to skip
   const skip = (page - 1) * perPage;
 
   try {
+    // Create the search filter
+    const searchFilter = search
+      ? { category_name: { $regex: search, $options: "i" } } // Case-insensitive search
+      : {};
     // Fetch all categories from the database
     const categories = await Category.aggregate([
+      { $match: searchFilter },
       {
         $project: {
           category_name: 1,
