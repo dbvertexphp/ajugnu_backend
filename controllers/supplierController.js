@@ -784,6 +784,15 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Cannot update the status of a cancelled item", status: false });
     }
 
+    // If the new status is "cancelled", increment the product quantity
+    if (new_status === "cancelled" && itemToUpdate) {
+      const product = await Product.findById(itemToUpdate.product_id);
+      if (product) {
+        product.quantity += itemToUpdate.quantity;
+        await product.save();
+      }
+    }
+
     // Find and update the order item
     const savedOrder = await Order.findOneAndUpdate(
       { _id: order_id, "items.supplier_id": supplier_id },

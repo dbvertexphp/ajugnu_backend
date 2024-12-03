@@ -302,6 +302,7 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
       ? {
           $or: [
             { user_name: { $regex: search, $options: "i" } },
+            { payment_id: { $regex: search, $options: "i" } },
           ],
         }
       : {};

@@ -1405,22 +1405,22 @@ const getAllOrders = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
   const limit = parseInt(req.query.limit) || 10; // Number of orders per page, default to 10
   const search = req.query.search || ""; // Search term
-  const sortBy = req.query.sortBy || "createdAt"; // Field to sort by, default to 'createdAt'
+  const sortBy = req.query.sortBy || "created_at"; // Field to sort by, default to 'createdAt'
   const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
 
   try {
-    const query = search
+      const query = search
       ? {
           $or: [
             { "shipping_address.name": { $regex: search, $options: "i" } },
-            { "shipping_address.address": { $regex: search, $options: "i" } },
-            { "shipping_address.pincode": { $regex: search, $options: "i" } },
-            { "shipping_address.mobile_number": { $regex: search, $options: "i" } },
             { payment_method: { $regex: search, $options: "i" } },
             { order_id: { $regex: search, $options: "i" } },
           ],
         }
       : {};
+
+
+
 
     const totalOrders = await Order.countDocuments(query);
     const orders = await Order.find(query)
@@ -3008,6 +3008,17 @@ const updateCancelOrder = asyncHandler(async (req, res) => {
 
     // Filter items to include only those with the updated status
     const filteredItems = savedOrder.items.filter((item) => item.status === new_status);
+
+    // Manage product quantities
+    for (const item of filteredItems) {
+      const product = await Product.findById(item.product_id);
+      if (product) {
+        product.quantity += item.quantity; // Increment stock by the cancelled quantity
+        await product.save();
+      } else {
+        console.warn(`Product with ID ${item.product_id} not found.`);
+      }
+    }
 
     // Send notification to user
     const user = await User.findById(user_id);
