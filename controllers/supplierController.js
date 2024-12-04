@@ -23,100 +23,104 @@ const { log } = require("console");
 dotenv.config();
 
 const updateSupplierProfileData = asyncHandler(async (req, res) => {
-  req.uploadPath = "uploads/profiles";
-  upload.fields([{ name: "profile_pic", maxCount: 1 }])(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({ error: err.message });
-    }
+      req.uploadPath = "uploads/profiles";
+      upload.fields([{ name: "profile_pic", maxCount: 1 }])(req, res, async (err) => {
+        if (err) {
+          return res.status(400).json({ error: err.message });
+        }
 
-    const { full_name, mobile, email, address, pin_code } = req.body;
-    const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
+        const { full_name, mobile, email, address, pin_code } = req.body;
+        const supplier_id = req.headers.userID; // Assuming you have user authentication middleware
 
-    // Get the profile picture path if uploaded
-    const profile_pic = req.files.profile_pic ? `${req.uploadPath}/${req.files.profile_pic[0].filename}` : null;
+        // Get the profile picture path if uploaded
+        const profile_pic = req.files.profile_pic ? `${req.uploadPath}/${req.files.profile_pic[0].filename}` : null;
 
-    try {
-      // Find the current user to get the old image paths and pin codes
-      const currentUser = await User.findById(supplier_id);
-      if (!currentUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
+        try {
+          // Find the current user to get the old image paths and pin codes
+          const currentUser = await User.findById(supplier_id);
+          if (!currentUser) {
+            return res.status(404).json({ message: "User not found" });
+          }
 
-      // Build the update object with optional fields
-      let updateFields = {
-        datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
-      };
+          // Build the update object with optional fields
+          let updateFields = {
+            datetime: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+          };
 
-      // Update optional fields if provided
-      if (full_name) {
-        updateFields.full_name = full_name;
-      }
-      if (mobile) {
-        updateFields.mobile = mobile;
-      }
-      if (email) {
-        updateFields.email = email;
-      }
-      if (address) {
-        updateFields.address = address;
-      }
+          // Update optional fields if provided
+          if (full_name) {
+            updateFields.full_name = full_name;
+          }
+          if (mobile) {
+            updateFields.mobile = mobile;
+          }
+          if (email) {
+            updateFields.email = email;
+          }
+          if (address) {
+            updateFields.address = address;
+          }
 
-      // Check if there is a new profile pic uploaded and delete the old one
-      if (profile_pic && currentUser.profile_pic) {
-        const oldProfilePicPath = currentUser.profile_pic;
-        updateFields.profile_pic = profile_pic;
+          // Only update profile_pic if a new one is uploaded
+          if (profile_pic) {
+            // Check if there is a new profile pic uploaded and delete the old one
+            if (currentUser.profile_pic) {
+              const oldProfilePicPath = currentUser.profile_pic;
+              updateFields.profile_pic = profile_pic;
 
-        // Delete the old profile picture
-        deleteFile(oldProfilePicPath);
-      } else if (profile_pic) {
-        updateFields.profile_pic = profile_pic;
-      }
+              // Delete the old profile picture
+              deleteFile(oldProfilePicPath);
+            } else {
+              updateFields.profile_pic = profile_pic;
+            }
+          }
 
-      // Handle pin_code as an array and update it
-      let pinCodesArray = [];
-      if (pin_code) {
-        pinCodesArray = Array.isArray(pin_code) ? pin_code : [parseInt(pin_code, 10)];
-        pinCodesArray = [...new Set(pinCodesArray)]; // Remove duplicates
-      }
+          // Handle pin_code as an array and update it
+          let pinCodesArray = [];
+          if (pin_code) {
+            pinCodesArray = Array.isArray(pin_code) ? pin_code : [parseInt(pin_code, 10)];
+            pinCodesArray = [...new Set(pinCodesArray)]; // Remove duplicates
+          }
 
-      // Update the user's profile fields
-      const updatedUser = await User.findByIdAndUpdate(
-        supplier_id,
-        {
-          $set: {
-            full_name: updateFields.full_name,
-            mobile: updateFields.mobile,
-            email: updateFields.email,
-            address: updateFields.address,
-            profile_pic: updateFields.profile_pic,
-            datetime: updateFields.datetime,
-            pin_code: pinCodesArray, // Directly set the new pin codes array
-          },
-        },
-        { new: true }
-      );
+          // Update the user's profile fields
+          const updatedUser = await User.findByIdAndUpdate(
+            supplier_id,
+            {
+              $set: {
+                full_name: updateFields.full_name,
+                mobile: updateFields.mobile,
+                email: updateFields.email,
+                address: updateFields.address,
+                profile_pic: updateFields.profile_pic, // Only set if updated
+                datetime: updateFields.datetime,
+                pin_code: pinCodesArray, // Directly set the new pin codes array
+              },
+            },
+            { new: true }
+          );
 
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
+          if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+          }
 
-      // Return the updated user data
-      return res.status(200).json({
-        _id: updatedUser._id,
-        full_name: updatedUser.full_name,
-        mobile: updatedUser.mobile,
-        email: updatedUser.email,
-        address: updatedUser.address,
-        pin_code: updatedUser.pin_code,
-        profile_pic: updatedUser.profile_pic,
-        status: true,
+          // Return the updated user data
+          return res.status(200).json({
+            _id: updatedUser._id,
+            full_name: updatedUser.full_name,
+            mobile: updatedUser.mobile,
+            email: updatedUser.email,
+            address: updatedUser.address,
+            pin_code: updatedUser.pin_code,
+            profile_pic: updatedUser.profile_pic,
+            status: true,
+          });
+        } catch (error) {
+          console.error("Error updating user profile:", error.message);
+          return res.status(500).json({ error: "Internal Server Error" });
+        }
       });
-    } catch (error) {
-      console.error("Error updating user profile:", error.message);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-  });
-});
+    });
+
 
 const getSupplierProfileData = asyncHandler(async (req, res) => {
   const supplier_id = req.headers.userID; // Assuming you have user authentication middleware

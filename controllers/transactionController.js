@@ -294,65 +294,25 @@ const getAllTransactionsByTeacher = asyncHandler(async (req, res) => {
   }
 });
 
-const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
-  try {
-    // Build the search query
-    const searchQuery = search
-      ? {
-          $or: [
-            { user_name: { $regex: search, $options: "i" } },
-            { payment_id: { $regex: search, $options: "i" } },
-          ],
-        }
-      : {};
-
-    // Fetch transactions with pagination and search
-    const transactions = await Transaction.find(searchQuery)
-      .sort({ [sortBy]: order === "desc" ? -1 : 1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit))
-      .populate("user_id order_id items.product_id items.supplier_id");
-
-    // Count total number of transactions matching the search query
-    const totalTransactions = await Transaction.countDocuments(searchQuery);
-
-    res.status(200).json({
-      message: "Transactions fetched successfully",
-      transactions,
-      totalPages: Math.ceil(totalTransactions / limit),
-      currentPage: parseInt(page),
-      totalTransactions,
-    });
-  } catch (error) {
-    console.error("Error fetching transactions:", error.message);
-    res.status(500).json({ message: "Internal Server Error", status: false });
-  }
-});
-
 // const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
 //   const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
-
 //   try {
-//     // Get a list of users matching the search term to filter transactions by user_id
-//     const userIds = search
-//       ? await User.find({ full_name: { $regex: search, $options: "i" } }).select("_id")
-//       : [];
-
-//       console.log(userIds);
-
-
+//     // Build the search query
 //     const searchQuery = search
-//       ? { user_id: { $in: userIds.map(user => user._id) } }
+//       ? {
+//           $or: [
+//             { user_name: { $regex: search, $options: "i" } },
+//             { payment_id: { $regex: search, $options: "i" } },
+//           ],
+//         }
 //       : {};
 
-//     // Fetch transactions with pagination, sorting, and the search filter
+//     // Fetch transactions with pagination and search
 //     const transactions = await Transaction.find(searchQuery)
 //       .sort({ [sortBy]: order === "desc" ? -1 : 1 })
 //       .skip((page - 1) * limit)
 //       .limit(parseInt(limit))
-//       .populate("user_id", "full_name")  // Populate to get user full name
-//       .populate("order_id items.product_id items.supplier_id");
+//       .populate("user_id order_id items.product_id items.supplier_id");
 
 //     // Count total number of transactions matching the search query
 //     const totalTransactions = await Transaction.countDocuments(searchQuery);
@@ -369,6 +329,98 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
 //     res.status(500).json({ message: "Internal Server Error", status: false });
 //   }
 // });
+
+const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
+      const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
+
+      try {
+        const pipeline = [];
+
+        // Step 1: Lookup for populating fields
+        pipeline.push(
+          {
+            $lookup: {
+              from: "users",
+              localField: "user_id",
+              foreignField: "_id",
+              as: "userDetails",
+            },
+          },
+          {
+            $lookup: {
+              from: "orders",
+              localField: "order_id",
+              foreignField: "_id",
+              as: "orderDetails",
+            },
+          },
+          {
+            $lookup: {
+              from: "products",
+              localField: "items.product_id",
+              foreignField: "_id",
+              as: "productDetails",
+            },
+          },
+          {
+            $lookup: {
+              from: "suppliers",
+              localField: "items.supplier_id",
+              foreignField: "_id",
+              as: "supplierDetails",
+            },
+          }
+        );
+
+        // Step 2: Unwind arrays for search purposes (if needed)
+        pipeline.push(
+          { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
+          { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } }
+        );
+
+        // Step 3: Add search filters
+        if (search) {
+          pipeline.push({
+            $match: {
+              $or: [
+                { "userDetails.full_name": { $regex: search, $options: "i" } }, // Search in user name
+                { "orderDetails.order_id": search }, // Exact search in order_id
+                { payment_id: { $regex: search, $options: "i" } }, // Search in payment_id
+              ],
+            },
+          });
+        }
+
+        // Step 4: Add sorting, pagination
+        pipeline.push(
+          { $sort: { [sortBy]: order === "desc" ? -1 : 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: parseInt(limit) }
+        );
+
+        // Fetch transactions with aggregation pipeline
+        const transactions = await Transaction.aggregate(pipeline);
+
+        // Count total transactions (with the same pipeline excluding pagination and sorting)
+        const totalTransactions = await Transaction.aggregate([
+          ...pipeline.filter((stage) => !("$skip" in stage || "$limit" in stage || "$sort" in stage)),
+          { $count: "total" },
+        ]);
+
+        res.status(200).json({
+          message: "Transactions fetched successfully",
+          transactions,
+          totalPages: Math.ceil((totalTransactions[0]?.total || 0) / limit),
+          currentPage: parseInt(page),
+          totalTransactions: totalTransactions[0]?.total || 0,
+        });
+      } catch (error) {
+        console.error("Error fetching transactions:", error.message);
+        res.status(500).json({ message: "Internal Server Error", status: false });
+      }
+});
+
+
 
 
 
