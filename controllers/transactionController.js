@@ -384,7 +384,7 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
             $match: {
               $or: [
                 { "userDetails.full_name": { $regex: search, $options: "i" } }, // Search in user name
-                { "orderDetails.order_id": search }, // Exact search in order_id
+                { "orderDetails.order_id": { $regex: search, $options: "i" } }, // Exact search in order_id
                 { payment_id: { $regex: search, $options: "i" } }, // Search in payment_id
               ],
             },
