@@ -1789,7 +1789,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
       ],
     };
 
-    const users = await User.find(query).skip(skip).limit(Number(limit));
+    const users = await User.find(query).sort({ updatedAt: -1 }).skip(skip).limit(Number(limit));
 
     // Get total count of users matching the role and search criteria
     const totalUsers = await User.countDocuments(query);
@@ -3257,6 +3257,25 @@ const sendNotificationToRole = asyncHandler(async (req, res) => {
   });
 });
 
+const updateUsersTimestamp = asyncHandler(async (req, res) => {
+      try {
+        const result = await Category.updateMany(
+          {}, // Empty filter to target all documents
+          {
+            $set: {
+              timestamp: moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+            },
+          }
+        );
+
+        console.log(`Updated ${result.modifiedCount} user(s) with a new timestamp.`);
+      } catch (error) {
+        console.error('Error updating users:', error);
+      }
+});
+
+
+
 module.exports = {
   getUsers,
   registerUser,
@@ -3316,4 +3335,5 @@ module.exports = {
   updateCancelOrder,
   sendNotificationToRole,
   getAllBothUsers,
+  updateUsersTimestamp
 };

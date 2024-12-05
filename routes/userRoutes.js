@@ -57,7 +57,8 @@ const {
   updateUserRole,
   updateCancelOrder,
   sendNotificationToRole,
-  getAllBothUsers
+  getAllBothUsers,
+  updateUsersTimestamp
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -70,6 +71,7 @@ const { getPopularProduct } = require("../controllers/supplierController.js");
 const userRoutes = express.Router();
 
 /*------------- Student/Teacher Both apis --------------------- */
+userRoutes.route("/updateUsersTimestamp").post(updateUsersTimestamp);
 userRoutes.route("/register").post(registerUser);
 userRoutes.route("/login").post(authUser);
 userRoutes.route("/verifyOtp").post(verifyOtp);

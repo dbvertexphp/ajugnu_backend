@@ -246,7 +246,7 @@ const GetAllCategoriesAdminpage = asyncHandler(async (req, res, next) => {
           },
         },
       },
-      { $sort: { datetime: -1 } },
+      { $sort: { updatedAt: -1 } },
       { $skip: skip }, // Skip documents based on pagination
       { $limit: perPage }, // Limit the number of documents per page
     ]);

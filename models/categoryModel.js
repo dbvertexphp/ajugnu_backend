@@ -12,15 +12,22 @@ const subcategorySchema = new mongoose.Schema({
 });
 
 // Define the main category schema
-const categorySchema = new mongoose.Schema({
-  category_name: { type: String, required: true },
-  datetime: {
-    type: String,
-    default: () => moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+const categorySchema = new mongoose.Schema(
+  {
+    category_name: { type: String, required: true },
+    datetime: {
+      type: String,
+      default: () => moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+    },
+    category_image: { type: String },
+    subcategories: [subcategorySchema], // Embed subcategories
+    timestamp: {
+      type: Date,
+      default: () => moment().tz("Asia/Kolkata").toDate()
+    },
   },
-  category_image: { type: String },
-  subcategories: [subcategorySchema], // Embed subcategories
-});
+  { timestamps: true }
+);
 
 // Middleware to capitalize the first letter of category names
 categorySchema.pre("save", function (next) {

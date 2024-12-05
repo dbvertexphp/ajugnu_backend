@@ -2,27 +2,34 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const moment = require("moment-timezone");
 
-const userSchema = mongoose.Schema({
-  full_name: { type: String },
-  email: {
-    type: String,
+const userSchema = mongoose.Schema(
+  {
+    full_name: { type: String },
+    email: {
+      type: String,
+    },
+    mobile: { type: String, unique: true },
+    password: { type: String, required: true },
+    role: { type: String, required: true, enum: ["user", "supplier", "both"] },
+    otp: { type: String },
+    otp_verified: { type: Number, default: 0 },
+    firebase_token: { type: String, default: "dummy_token" },
+    pin_code: { type: [String], default: [] },
+    profile_pic: {
+      type: String,
+    },
+    address: { type: String },
+    datetime: {
+      type: String,
+      default: () => moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
+    },
+    timestamp: {
+      type: Date,
+      default: () => moment().tz("Asia/Kolkata").toDate()
+    },
   },
-  mobile: { type: String, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, required: true, enum: ["user", "supplier", "both"] },
-  otp: { type: String },
-  otp_verified: { type: Number, default: 0 },
-  firebase_token: { type: String, default: "dummy_token" },
-  pin_code: { type: [String], default: [] },
-  profile_pic: {
-    type: String,
-  },
-  address: { type: String },
-  datetime: {
-    type: String,
-    default: () => moment().tz("Asia/Kolkata").format("YYYY-MMM-DD hh:mm:ss A"),
-  },
-});
+  { timestamps: true }
+);
 
 const adminDashboardSchema = new mongoose.Schema({
   video_count: { type: Number, default: 0 },
