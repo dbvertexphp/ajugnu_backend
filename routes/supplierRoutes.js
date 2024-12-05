@@ -60,7 +60,7 @@ supplierRoutes.get("/getOrdersBySupplierId", protect, Authorization(["supplier",
 
 supplierRoutes.put("/updateOrderItemStatus", protect, Authorization(["supplier","both"]), updateOrderItemStatus);
 
-supplierRoutes.post("/updateSupplierProfileData", protect, Authorization(["supplier","both"]), updateSupplierProfileData);
+supplierRoutes.put("/updateSupplierProfileData", protect, Authorization(["supplier","both"]), updateSupplierProfileData);
 
 supplierRoutes.get("/getSupplierProfileData", protect, Authorization(["supplier","both","admin"]), getSupplierProfileData);
 
