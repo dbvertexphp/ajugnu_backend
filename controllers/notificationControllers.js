@@ -10,25 +10,27 @@ admin.initializeApp({
 });
 
 const sendFCMNotification = async (registrationToken, title, body, imageUrl = null) => {
-      const message = {
-        notification: {
-          title,
-          body,
-        },
-        data:{
-            imageUrl: imageUrl || undefined, // Only include image if it's provided
-        },
-        token: registrationToken,
-      };
+  const message = {
+    //   notification: {
+    //     title,
+    //     body,
 
-      try {
-        const response = await admin.messaging().send(message);
-        return { success: true, response };
-      } catch (error) {
-        return { success: false, error };
-      }
+    //   },
+    data: {
+      title,
+      body,
+      imageUrl: imageUrl || undefined, // Only include image if it's provided
+    },
+    token: registrationToken,
+  };
+
+  try {
+    const response = await admin.messaging().send(message);
+    return { success: true, response };
+  } catch (error) {
+    return { success: false, error };
+  }
 };
-
 
 const createNotification = async (sender_id, receiver_id, message, type, data = null) => {
   try {
