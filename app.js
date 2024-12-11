@@ -50,12 +50,18 @@ app.use("/uploads", express.static("uploads/subcategory"));
 app.use("/uploads", express.static("uploads/tools"));
 app.use("/uploads", express.static("uploads/notification"));
 app.use(express.json()); // to accept JSON data
-app.use(cors());
-app.use(
-  cors({
-    origin: "*", // Replace with your React app's origin
-  })
-);
+// app.use(cors());
+
+const corsOptions = {
+      origin: (origin, callback) => {
+        if (origin === process.env.BASE_URL || !origin) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+    };
+app.use(cors(corsOptions));
 
 
 
