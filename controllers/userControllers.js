@@ -1774,61 +1774,81 @@ const getBankDetailsAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+// const getAllUsers = asyncHandler(async (req, res) => {
+//   try {
+//     const { page = 1, limit = 10, search = "" } = req.query;
+
+//     const skip = (page - 1) * limit;
+//     const searchRegex = search ? new RegExp(search, "i") : null;
+
+//     // Convert search to a number if it is numeric
+//     const mobileSearch = isNaN(search) ? null : new RegExp(search);
+//     const pincodeSearch = isNaN(search) ? null : new RegExp(search);
+
+//     // Build the query object
+//     const query = {
+//       role: "user",
+//       $or: [
+//         ...(searchRegex ? [{ full_name: searchRegex }] : []),
+//         ...(searchRegex ? [{ email: searchRegex }] : []),
+//         ...(mobileSearch ? [{ mobile: mobileSearch }] : []),
+//         ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : []),
+//       ],
+//     };
+
+//     const users = await User.find(query).sort({ updatedAt: -1 }).skip(skip).limit(Number(limit));
+
+//     const totalUsers = await User.countDocuments(query);
+
+//     res.json({
+//       Users: users,
+//       total_rows: totalUsers,
+//       totalPages: Math.ceil(totalUsers / limit),
+//       currentPage: Number(page),
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({
+//       message: "Internal Server Error",
+//       status: false,
+//     });
+//   }
+// });
+
 const getAllUsers = asyncHandler(async (req, res) => {
-  try {
-    const { page = 1, limit = 10, search = "" } = req.query;
-    const skip = (page - 1) * limit;
-    const searchRegex = search ? new RegExp(search, "i") : null;
+      try {
+        const { page = 1, limit = 10, search = "" } = req.query;
+        const skip = (page - 1) * limit;
+        const query = {
+          role: "user",
+        };
 
-    // Convert search to a number if it is numeric
-    const mobileSearch = isNaN(search) ? null : new RegExp(search);
-    const pincodeSearch = isNaN(search) ? null : new RegExp(search);
+        if (search) {
+          const searchRegex = new RegExp(search, "i");
+          query.$or = [
+            { full_name: searchRegex },
+            { email: searchRegex },
+            { mobile: searchRegex },
+            { pin_code: { $in: [searchRegex] } }
+          ];
+        }
 
-    // Build the query object
-    const query = {
-      // role: { $in: ["user", "both"] },
-      role: "user",
-      $or: [
-        ...(searchRegex ? [{ full_name: searchRegex }] : []), // Search by name if regex is valid
-        ...(searchRegex ? [{ email: searchRegex }] : []), // Search by email if regex is valid
-        ...(mobileSearch ? [{ mobile: mobileSearch }] : []), // Search by mobile if valid
-        ...(pincodeSearch ? [{ pin_code: pincodeSearch }] : []), // Search by pincode if valid
-      ],
-    };
+        const totalUsers = await User.countDocuments(query);
+        const users = await User.find(query)
+          .skip(skip)
+          .limit(Number(limit))
+          .select("full_name email mobile pic updatedAt pin_code role");
 
-    const users = await User.find(query).sort({ updatedAt: -1 }).skip(skip).limit(Number(limit));
-
-    // Get total count of users matching the role and search criteria
-    const totalUsers = await User.countDocuments(query);
-
-    const transformedUsersPromises = users.map(async (user) => {
-      let transformedUser = { ...user.toObject() };
-      if (transformedUser.pic) {
-        const getSignedUrl_pic = await getSignedUrlS3(transformedUser.pic);
-        transformedUser.pic = getSignedUrl_pic;
+        res.status(200).json({
+          Users: users,
+          currentPage: Number(page),
+          totalPages: Math.ceil(totalUsers / limit),
+        });
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).json({ message: "Server Error" });
       }
-      if (transformedUser.watch_time) {
-        transformedUser.watch_time = convertSecondsToReadableTimeAdmin(transformedUser.watch_time);
-      }
-      return { user: transformedUser };
     });
-
-    const transformedUsers = await Promise.all(transformedUsersPromises);
-
-    res.json({
-      Users: transformedUsers,
-      total_rows: totalUsers,
-      totalPages: Math.ceil(totalUsers / limit),
-      currentPage: Number(page),
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      status: false,
-    });
-  }
-});
 
 const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
   try {
