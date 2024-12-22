@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [18.x]
 
     steps:
       # Step 1: Backup the uploads directory
@@ -58,7 +58,7 @@ jobs:
           cache: "npm"
 
       - run: npm ci --force
-      - run: npm update --force
+      - run: npm install --force
 
       # Step 6: Restart the application
-      - run: pm2 restart app
+      - run: pm2 restart app.js

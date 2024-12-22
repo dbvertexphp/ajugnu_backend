@@ -39,6 +39,7 @@
     "fs": "^0.0.1-security",
     "fs.promises": "^0.1.2",
     "jsonwebtoken": "^8.5.1",
+    "ltx": "^3.0.0",
     "moment": "^2.29.4",
     "moment-business-days": "^1.2.0",
     "moment-timezone": "^0.5.44",
