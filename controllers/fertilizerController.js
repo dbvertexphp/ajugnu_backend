@@ -190,35 +190,57 @@ const editProduct = asyncHandler(async (req, res, next) => {
 });
 
 const deleteFertilizer = asyncHandler(async (req, res) => {
-  const { product_id } = req.body; // Product ID is provided in the URL
+      const { product_id } = req.body; // Product ID is provided in the body
 
-  try {
-    // Validate the product_id and supplier_id
-    if (!product_id) {
-      return res.status(400).json({
-        message: "Product ID and Supplier ID are required.",
-        status: false,
-      });
-    }
+      try {
+        // Validate the product_id
+        if (!product_id) {
+          return res.status(400).json({
+            message: "Product ID is required.",
+            status: false,
+          });
+        }
 
-    // Find the product to be deleted
-    const product = await Product.findById(product_id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found", status: false });
-    }
+        // Find the product to be deleted
+        const product = await Product.findById(product_id);
+        if (!product) {
+          return res.status(404).json({ message: "Product not found", status: false });
+        }
 
-    // Delete the product
-    await Product.findByIdAndDelete(product_id);
+        // Delete all images in the product_images array
+        const imagePaths = product.product_images; // Assuming product_images is an array
+        if (Array.isArray(imagePaths) && imagePaths.length > 0) {
+          imagePaths.forEach((imagePath) => {
+            if (imagePath) {
+              const filePath = path.join(
+                __dirname,
+                '..',
+                'uploads',
+                'fertilizer',
+                path.basename(imagePath)
+              );
 
-    res.status(200).json({
-      message: "Fertilizer deleted successfully.",
-      status: true,
+              fs.unlink(filePath, (err) => {
+                if (err) {
+                  console.error(`Error deleting image ${imagePath}:`, err);
+                }
+              });
+            }
+          });
+        }
+
+        // Delete the product
+        await Product.findByIdAndDelete(product_id);
+
+        res.status(200).json({
+          message: "Fertilizer deleted successfully.",
+          status: true,
+        });
+      } catch (error) {
+        console.error("Error deleting product:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
-  } catch (error) {
-    console.error("Error deleting product:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
 
 const getProducts = asyncHandler(async (req, res) => {
   const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header

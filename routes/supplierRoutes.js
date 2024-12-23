@@ -25,7 +25,8 @@ const {
   getSimilarProducts,
   updateProductDefaultStatus,
   addProductType,
-  getProductTypes
+  getProductTypes,
+  deleteSupplierProduct
 
 } = require("../controllers/supplierController.js");
 
@@ -80,6 +81,7 @@ supplierRoutes.post("/addProductType", protect, Authorization(["admin"]), addPro
 
 supplierRoutes.get("/getProductTypes", protect, Authorization(["supplier","both"]), getProductTypes);
 
+supplierRoutes.post("/deleteSupplierProduct", protect, Authorization(["admin"]), deleteSupplierProduct);
 
 
 

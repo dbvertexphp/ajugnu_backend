@@ -1,7 +1,5 @@
 const Authorization = (roles) => {
   return (req, res, next) => {
-      console.log(req.headers.role);
-
     if (roles.includes(req.headers.role)) {
       next();
     } else {

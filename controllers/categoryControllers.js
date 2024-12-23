@@ -5,6 +5,8 @@ const baseURL = process.env.BASE_URL;
 const ErrorHandler = require("../utils/errorHandler.js");
 const multer = require("multer");
 const path = require("path");
+const fs = require('fs');
+
 // const upload = require("../middleware/uploadMiddleware.js");
 
 const Createcategory = asyncHandler(async (req, res) => {
@@ -145,7 +147,22 @@ const DeleteCategory = asyncHandler(async (req, res) => {
   const category = await Category.findById(categoryId);
 
   if (category) {
+    // Assuming the image is stored in category.image field
+    const imagePath = category.category_image;
+    if (imagePath) {
+      // Delete the image from the server if it exists
+      const filePath = path.join(__dirname, '..', 'uploads', 'category', path.basename(imagePath));
+
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error("Error deleting image:", err);
+        }
+      });
+    }
+
+    // Remove the category from the database
     await category.remove();
+
     res.status(200).json({
       message: "Category deleted successfully.",
       status: true,

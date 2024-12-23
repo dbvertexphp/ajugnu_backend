@@ -187,6 +187,21 @@ const deleteTools = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "Tools not found", status: false });
     }
 
+    const imagePaths = product.product_images; // Assuming product_images is an array
+    if (Array.isArray(imagePaths) && imagePaths.length > 0) {
+      imagePaths.forEach((imagePath) => {
+        if (imagePath) {
+          const filePath = path.join(__dirname, "..", "uploads", "tools", path.basename(imagePath));
+
+          fs.unlink(filePath, (err) => {
+            if (err) {
+              console.error(`Error deleting image ${imagePath}:`, err);
+            }
+          });
+        }
+      });
+    }
+
     // Delete the product
     await Product.findByIdAndDelete(product_id);
 
