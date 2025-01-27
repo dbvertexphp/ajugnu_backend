@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const asyncHandler = require("express-async-handler");
 const cookie = require("cookie");
 const bcrypt = require("bcryptjs");
@@ -1101,40 +1102,99 @@ const getProductDetailByProductId = asyncHandler(async (req, res) => {
   }
 });
 
+// const getCartProducts = asyncHandler(async (req, res) => {
+//   const userID = req.headers.userID;
+
+//   try {
+//     // Validate userID
+//     if (!userID) {
+//       return res.status(400).json({ message: "User ID is required", status: false });
+//     }
+
+//     // Find all cart items for the user
+//     const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+
+//     if (!cartItems || cartItems.length === 0) {
+//       return res.status(404).json({ message: "No items found in cart", status: false });
+//     }
+
+//     //Calculate total amount
+//     let totalAmount = 0;
+//     cartItems.forEach((item) => {
+//       totalAmount += item.product_id.price * item.quantity;
+//     });
+
+//     // Return success response
+//     res.status(200).json({
+//       status: true,
+//       message: "Cart items retrieved successfully",
+//       cartItems,
+//       totalAmount,
+//     });
+//   } catch (error) {
+//     console.error("Error getting cart items:", error.message);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
+// edit by Atest
+
 const getCartProducts = asyncHandler(async (req, res) => {
-  const userID = req.headers.userID;
+      const userID = req.headers.userID;
 
-  try {
-    // Validate userID
-    if (!userID) {
-      return res.status(400).json({ message: "User ID is required", status: false });
-    }
+      try {
+        // Validate that userID exists in the headers
+        if (!userID) {
+          console.log("No userID found in the headers.");
+          return res.status(400).json({ message: "User ID is required", status: false });
+        }
 
-    // Find all cart items for the user
-    const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+        // Check if the userID is a valid ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(userID)) {
+          console.log(`Invalid userID format: ${userID}`);
+          return res.status(400).json({ message: "Invalid User ID format", status: false });
+        }
 
-    if (!cartItems || cartItems.length === 0) {
-      return res.status(404).json({ message: "No items found in cart", status: false });
-    }
+        // Try to find cart items for the given userID
+        console.log(`Finding cart items for userID: ${userID}`);
+        const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
 
-    //Calculate total amount
-    let totalAmount = 0;
-    cartItems.forEach((item) => {
-      totalAmount += item.product_id.price * item.quantity;
+        // Log the cartItems to check the results
+        console.log("Cart Items:", cartItems);
+
+        if (!cartItems || cartItems.length === 0) {
+          console.log("No cart items found for this user.");
+          return res.status(404).json({ message: "No items found in cart", status: false });
+        }
+
+        // Calculate total amount
+        let totalAmount = 0;
+        cartItems.forEach((item) => {
+          // Check if product_id exists before accessing price
+          if (item.product_id && item.product_id.price) {
+            console.log(`Calculating for item: ${item.product_id.name}`);
+            totalAmount += item.product_id.price * item.quantity;
+          } else {
+            console.log(`Skipping item due to missing price or product_id: ${item._id}`);
+          }
+        });
+
+        // Return success response
+        console.log(`Total amount calculated: ${totalAmount}`);
+        res.status(200).json({
+          status: true,
+          message: "Cart items retrieved successfully",
+          cartItems,
+          totalAmount,
+        });
+      } catch (error) {
+        // Enhanced error logging
+        console.error("Error in getCartProducts:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
+      }
     });
 
-    // Return success response
-    res.status(200).json({
-      status: true,
-      message: "Cart items retrieved successfully",
-      cartItems,
-      totalAmount,
-    });
-  } catch (error) {
-    console.error("Error getting cart items:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+// end
 
 const increaseCartQuantity = asyncHandler(async (req, res) => {
   const { product_id, quantity } = req.body;
