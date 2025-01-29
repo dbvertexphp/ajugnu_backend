@@ -58,7 +58,7 @@ const {
   updateCancelOrder,
   sendNotificationToRole,
   getAllBothUsers,
-  updateUsersTimestamp
+  updateUsersTimestamp,
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");

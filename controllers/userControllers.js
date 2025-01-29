@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const asyncHandler = require("express-async-handler");
 const cookie = require("cookie");
 const bcrypt = require("bcryptjs");
@@ -728,7 +728,6 @@ const getAllSupplier = asyncHandler(async (req, res) => {
     });
   }
 });
-
 // Controller function to get products by category_id
 const getProductByCategory_id = asyncHandler(async (req, res) => {
   const { category_id } = req.body;
@@ -1140,59 +1139,59 @@ const getProductDetailByProductId = asyncHandler(async (req, res) => {
 // edit by Atest
 
 const getCartProducts = asyncHandler(async (req, res) => {
-      const userID = req.headers.userID;
+  const userID = req.headers.userID;
 
-      try {
-        // Validate that userID exists in the headers
-        if (!userID) {
-          console.log("No userID found in the headers.");
-          return res.status(400).json({ message: "User ID is required", status: false });
-        }
+  try {
+    // Validate that userID exists in the headers
+    if (!userID) {
+      console.log("No userID found in the headers.");
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
 
-        // Check if the userID is a valid ObjectId format
-        if (!mongoose.Types.ObjectId.isValid(userID)) {
-          console.log(`Invalid userID format: ${userID}`);
-          return res.status(400).json({ message: "Invalid User ID format", status: false });
-        }
+    // Check if the userID is a valid ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(userID)) {
+      console.log(`Invalid userID format: ${userID}`);
+      return res.status(400).json({ message: "Invalid User ID format", status: false });
+    }
 
-        // Try to find cart items for the given userID
-        console.log(`Finding cart items for userID: ${userID}`);
-        const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+    // Try to find cart items for the given userID
+    console.log(`Finding cart items for userID: ${userID}`);
+    const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
 
-        // Log the cartItems to check the results
-        console.log("Cart Items:", cartItems);
+    // Log the cartItems to check the results
+    console.log("Cart Items:", cartItems);
 
-        if (!cartItems || cartItems.length === 0) {
-          console.log("No cart items found for this user.");
-          return res.status(404).json({ message: "No items found in cart", status: false });
-        }
+    if (!cartItems || cartItems.length === 0) {
+      console.log("No cart items found for this user.");
+      return res.status(404).json({ message: "No items found in cart", status: false });
+    }
 
-        // Calculate total amount
-        let totalAmount = 0;
-        cartItems.forEach((item) => {
-          // Check if product_id exists before accessing price
-          if (item.product_id && item.product_id.price) {
-            console.log(`Calculating for item: ${item.product_id.name}`);
-            totalAmount += item.product_id.price * item.quantity;
-          } else {
-            console.log(`Skipping item due to missing price or product_id: ${item._id}`);
-          }
-        });
-
-        // Return success response
-        console.log(`Total amount calculated: ${totalAmount}`);
-        res.status(200).json({
-          status: true,
-          message: "Cart items retrieved successfully",
-          cartItems,
-          totalAmount,
-        });
-      } catch (error) {
-        // Enhanced error logging
-        console.error("Error in getCartProducts:", error);
-        res.status(500).json({ error: "Internal Server Error", details: error.message });
+    // Calculate total amount
+    let totalAmount = 0;
+    cartItems.forEach((item) => {
+      // Check if product_id exists before accessing price
+      if (item.product_id && item.product_id.price) {
+        console.log(`Calculating for item: ${item.product_id.name}`);
+        totalAmount += item.product_id.price * item.quantity;
+      } else {
+        console.log(`Skipping item due to missing price or product_id: ${item._id}`);
       }
     });
+
+    // Return success response
+    console.log(`Total amount calculated: ${totalAmount}`);
+    res.status(200).json({
+      status: true,
+      message: "Cart items retrieved successfully",
+      cartItems,
+      totalAmount,
+    });
+  } catch (error) {
+    // Enhanced error logging
+    console.error("Error in getCartProducts:", error);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
 
 // end
 
@@ -1876,39 +1875,31 @@ const getBankDetailsAdmin = asyncHandler(async (req, res) => {
 // });
 
 const getAllUsers = asyncHandler(async (req, res) => {
-      try {
-        const { page = 1, limit = 10, search = "" } = req.query;
-        const skip = (page - 1) * limit;
-        const query = {
-          role: "user",
-        };
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+    const skip = (page - 1) * limit;
+    const query = {
+      role: "user",
+    };
 
-        if (search) {
-          const searchRegex = new RegExp(search, "i");
-          query.$or = [
-            { full_name: searchRegex },
-            { email: searchRegex },
-            { mobile: searchRegex },
-            { pin_code: { $in: [searchRegex] } }
-          ];
-        }
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [{ full_name: searchRegex }, { email: searchRegex }, { mobile: searchRegex }, { pin_code: { $in: [searchRegex] } }];
+    }
 
-        const totalUsers = await User.countDocuments(query);
-        const users = await User.find(query)
-          .skip(skip)
-          .limit(Number(limit))
-          .select("full_name email mobile pic updatedAt pin_code role");
+    const totalUsers = await User.countDocuments(query);
+    const users = await User.find(query).skip(skip).limit(Number(limit)).select("full_name email mobile pic updatedAt pin_code role");
 
-        res.status(200).json({
-          Users: users,
-          currentPage: Number(page),
-          totalPages: Math.ceil(totalUsers / limit),
-        });
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        res.status(500).json({ message: "Server Error" });
-      }
+    res.status(200).json({
+      Users: users,
+      currentPage: Number(page),
+      totalPages: Math.ceil(totalUsers / limit),
     });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
 
 const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
   try {
