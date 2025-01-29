@@ -10,14 +10,27 @@ admin.initializeApp({
 });
 
 const sendFCMNotification = async (registrationToken, title, body, imageUrl = null) => {
-  const message = {
-    data: {
-      title,
-      body,
-      imageUrl: imageUrl || undefined, // Only include image if it's provided
-    },
-    token: registrationToken,
-  };
+  let message;
+
+  if (imageUrl) {
+      message = {
+            data: {
+              title,
+              body,
+              imageUrl
+            },
+            token: registrationToken,
+          };
+  } else {
+      message = {
+            data: {
+              title,
+              body,
+
+            },
+            token: registrationToken,
+          };
+  }
 
   try {
     const response = await admin.messaging().send(message);
