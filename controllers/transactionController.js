@@ -71,16 +71,46 @@ const addTransaction = asyncHandler(async (req, res) => {
 });
 
 // Get all transactions with optional filtering, sorting, and pagination
+// const getAllTransactions = asyncHandler(async (req, res) => {
+//   const { page = 1, limit = 10, sortBy = "createdAt", order = "desc" } = req.query;
+
+//   try {
+//     // Fetch transactions with pagination
+//     const transactions = await Transaction.find()
+//       .sort({ [sortBy]: order === "desc" ? -1 : 1 })
+//       .skip((page - 1) * limit)
+//       .limit(parseInt(limit));
+//       // .populate("user_id order_id items.product_id items.supplier_id");
+
+//     // Count total number of transactions
+//     const totalTransactions = await Transaction.countDocuments();
+
+//     res.status(200).json({
+//       message: "Transactions fetched successfully",
+//       transactions,
+//       totalPages: Math.ceil(totalTransactions / limit),
+//       currentPage: parseInt(page),
+//       totalTransactions,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching transactions:", error.message);
+//     res.status(500).json({ message: "Internal Server Error", status: false });
+//   }
+// });
+
 const getAllTransactions = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, sortBy = "createdAt", order = "desc" } = req.query;
 
   try {
-    // Fetch transactions with pagination
+    // Fetch transactions with pagination and populate order details
     const transactions = await Transaction.find()
+      .populate({
+        path: "order_id", // Populating order details
+        select: "order_id",
+      })
       .sort({ [sortBy]: order === "desc" ? -1 : 1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
-    // .populate("user_id order_id items.product_id items.supplier_id");
 
     // Count total number of transactions
     const totalTransactions = await Transaction.countDocuments();
@@ -331,98 +361,84 @@ const getAllTransactionsByTeacher = asyncHandler(async (req, res) => {
 // });
 
 const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
-      const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
+  const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
 
-      try {
-        const pipeline = [];
+  try {
+    const pipeline = [];
 
-        // Step 1: Lookup for populating fields
-        pipeline.push(
-          {
-            $lookup: {
-              from: "users",
-              localField: "user_id",
-              foreignField: "_id",
-              as: "userDetails",
-            },
-          },
-          {
-            $lookup: {
-              from: "orders",
-              localField: "order_id",
-              foreignField: "_id",
-              as: "orderDetails",
-            },
-          },
-          {
-            $lookup: {
-              from: "products",
-              localField: "items.product_id",
-              foreignField: "_id",
-              as: "productDetails",
-            },
-          },
-          {
-            $lookup: {
-              from: "suppliers",
-              localField: "items.supplier_id",
-              foreignField: "_id",
-              as: "supplierDetails",
-            },
-          }
-        );
-
-        // Step 2: Unwind arrays for search purposes (if needed)
-        pipeline.push(
-          { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
-          { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } }
-        );
-
-        // Step 3: Add search filters
-        if (search) {
-          pipeline.push({
-            $match: {
-              $or: [
-                { "userDetails.full_name": { $regex: search, $options: "i" } }, // Search in user name
-                { "orderDetails.order_id": { $regex: search, $options: "i" } }, // Exact search in order_id
-                { payment_id: { $regex: search, $options: "i" } }, // Search in payment_id
-              ],
-            },
-          });
-        }
-
-        // Step 4: Add sorting, pagination
-        pipeline.push(
-          { $sort: { [sortBy]: order === "desc" ? -1 : 1 } },
-          { $skip: (page - 1) * limit },
-          { $limit: parseInt(limit) }
-        );
-
-        // Fetch transactions with aggregation pipeline
-        const transactions = await Transaction.aggregate(pipeline);
-
-        // Count total transactions (with the same pipeline excluding pagination and sorting)
-        const totalTransactions = await Transaction.aggregate([
-          ...pipeline.filter((stage) => !("$skip" in stage || "$limit" in stage || "$sort" in stage)),
-          { $count: "total" },
-        ]);
-
-        res.status(200).json({
-          message: "Transactions fetched successfully",
-          transactions,
-          totalPages: Math.ceil((totalTransactions[0]?.total || 0) / limit),
-          currentPage: parseInt(page),
-          totalTransactions: totalTransactions[0]?.total || 0,
-        });
-      } catch (error) {
-        console.error("Error fetching transactions:", error.message);
-        res.status(500).json({ message: "Internal Server Error", status: false });
+    // Step 1: Lookup for populating fields
+    pipeline.push(
+      {
+        $lookup: {
+          from: "users",
+          localField: "user_id",
+          foreignField: "_id",
+          as: "userDetails",
+        },
+      },
+      {
+        $lookup: {
+          from: "orders",
+          localField: "order_id",
+          foreignField: "_id",
+          as: "orderDetails",
+        },
+      },
+      {
+        $lookup: {
+          from: "products",
+          localField: "items.product_id",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "items.supplier_id",
+          foreignField: "_id",
+          as: "supplierDetails",
+        },
       }
+    );
+
+    // Step 2: Unwind arrays for search purposes (if needed)
+    pipeline.push({ $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } }, { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } });
+
+    // Step 3: Add search filters
+    if (search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { "userDetails.full_name": { $regex: search, $options: "i" } }, // Search in user name
+            { "orderDetails.order_id": { $regex: search, $options: "i" } }, // Exact search in order_id
+            { payment_id: { $regex: search, $options: "i" } }, // Search in payment_id
+          ],
+        },
+      });
+    }
+
+    // Step 4: Add sorting, pagination
+    pipeline.push({ $sort: { [sortBy]: order === "desc" ? -1 : 1 } }, { $skip: (page - 1) * limit }, { $limit: parseInt(limit) });
+
+    // Fetch transactions with aggregation pipeline
+    const transactions = await Transaction.aggregate(pipeline);
+
+    // Count total transactions (with the same pipeline excluding pagination and sorting)
+    const totalTransactions = await Transaction.aggregate([...pipeline.filter((stage) => !("$skip" in stage || "$limit" in stage || "$sort" in stage)), { $count: "total" }]);
+
+    res.status(200).json({
+      message: "Transactions fetched successfully",
+      transactions,
+      totalPages: Math.ceil((totalTransactions[0]?.total || 0) / limit),
+      currentPage: parseInt(page),
+      totalTransactions: totalTransactions[0]?.total || 0,
+    });
+  } catch (error) {
+    console.error("Error fetching transactions:", error.message);
+    res.status(500).json({ message: "Internal Server Error", status: false });
+  }
 });
-
-
-
-
 
 module.exports = {
   addTransaction,

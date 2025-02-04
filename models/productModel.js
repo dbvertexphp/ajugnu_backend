@@ -20,6 +20,7 @@ const productSchema = new Schema(
       ref: "Category",
       default: null,
     },
+    user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     price: {
       type: Number,
     },

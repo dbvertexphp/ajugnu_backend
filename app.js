@@ -52,18 +52,21 @@ app.use("/uploads", express.static("uploads/notification"));
 app.use(express.json()); // to accept JSON data
 // app.use(cors());
 
+// const corsOptions = {
+//   origin: (origin, callback) => {
+//     if (origin === process.env.BASE_URL || !origin) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error("Not allowed by CORS"));
+//     }
+//   },
+// };
 const corsOptions = {
-      origin: (origin, callback) => {
-        if (origin === process.env.BASE_URL || !origin) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
-    };
+  origin: (origin, callback) => {
+      callback(null, true);
+  },
+};
 app.use(cors(corsOptions));
-
-
 
 // --------------------------Routes------------------------------
 

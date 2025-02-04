@@ -606,7 +606,7 @@ const getAllProductsInAdmin = asyncHandler(async (req, res) => {
 
     const totalProducts = await Product.countDocuments(query);
     const products = await Product.find(query)
-      .populate("category_id")
+      .populate("category_id supplier_id")
       .sort({ [sortBy]: order })
       .skip((page - 1) * limit)
       .limit(limit);

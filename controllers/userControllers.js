@@ -277,6 +277,8 @@ const authUser = asyncHandler(async (req, res) => {
   const { mobile, password, firebase_token } = req.body; // Include firebase_token from request body
   const userdata = await User.findOne({ mobile });
 
+  console.log("Hellooooooooooo");
+
   if (!userdata) {
     throw new ErrorHandler("User Not Found.", 400);
   }
