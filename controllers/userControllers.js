@@ -277,7 +277,6 @@ const authUser = asyncHandler(async (req, res) => {
   const { mobile, password, firebase_token } = req.body; // Include firebase_token from request body
   const userdata = await User.findOne({ mobile });
 
-  console.log("Hellooooooooooo");
 
   if (!userdata) {
     throw new ErrorHandler("User Not Found.", 400);
@@ -1502,7 +1501,7 @@ const getAllOrders = asyncHandler(async (req, res) => {
         const transaction = await Transaction.findOne({ order_id: order._id });
         return {
           ...order.toObject(),
-          payment_status: transaction ? transaction.payment_status : "unknown",
+          payment_status: transaction ? transaction.payment_status : "Cash",
         };
       })
     );
