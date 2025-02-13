@@ -277,7 +277,6 @@ const authUser = asyncHandler(async (req, res) => {
   const { mobile, password, firebase_token } = req.body; // Include firebase_token from request body
   const userdata = await User.findOne({ mobile });
 
-
   if (!userdata) {
     throw new ErrorHandler("User Not Found.", 400);
   }
@@ -1194,6 +1193,48 @@ const getCartProducts = asyncHandler(async (req, res) => {
   }
 });
 
+// const getCartProducts = asyncHandler(async (req, res) => {
+//   const userID = req.headers.userID;
+
+//   try {
+//     if (!userID) {
+//       return res.status(400).json({ message: "User ID is required", status: false });
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(userID)) {
+//       return res.status(400).json({ message: "Invalid User ID format", status: false });
+//     }
+
+//     console.log(`Finding cart items for userID: ${userID}`);
+
+//     const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+
+//     // Remove items where product_id is null (population failure)
+//     const validCartItems = cartItems.filter((item) => item.product_id !== null);
+
+//     if (!validCartItems.length) {
+//       return res.status(404).json({ message: "No items found in cart", status: false });
+//     }
+
+//     let totalAmount = 0;
+//     validCartItems.forEach((item) => {
+//       if (item.product_id?.price) {
+//         totalAmount += item.product_id.price * item.quantity;
+//       }
+//     });
+
+//     res.status(200).json({
+//       status: true,
+//       message: "Cart items retrieved successfully",
+//       cartItems: validCartItems,
+//       totalAmount,
+//     });
+//   } catch (error) {
+//     console.error("Error in getCartProducts:", error);
+//     res.status(500).json({ error: "Internal Server Error", details: error.message });
+//   }
+// });
+
 // end
 
 const increaseCartQuantity = asyncHandler(async (req, res) => {
@@ -1428,6 +1469,9 @@ const checkout = asyncHandler(async (req, res) => {
   }
 });
 
+
+
+
 const getOrderNotifications = asyncHandler(async (req, res) => {
   const userID = req.headers.userID;
 
@@ -1458,14 +1502,22 @@ const getOrderNotifications = asyncHandler(async (req, res) => {
   }
 });
 
+// const generateVerificationCode = () => {
+//   const characters = "0123456789";
+//   let code = "";
+//   for (let i = 0; i < 6; i++) {
+//     code += characters.charAt(Math.floor(Math.random() * characters.length));
+//   }
+//   return code;
+// };
+
+//edit by Atest
+
 const generateVerificationCode = () => {
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return code;
-};
+      return Math.floor(100000 + Math.random() * 900000).toString();
+    };
+
+
 
 const generateOrderID = () => {
   const randomNumber = Math.floor(Math.random() * 10000000); // Generate a number between 0 and 9999999

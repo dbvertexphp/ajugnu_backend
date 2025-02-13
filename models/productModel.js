@@ -67,6 +67,10 @@ const productSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    delete_status:{
+     type: Boolean,
+     default: true,
+    }
   },
   { timestamps: true }
 );

@@ -242,6 +242,42 @@ const deleteFertilizer = asyncHandler(async (req, res) => {
       }
     });
 
+
+    const updateDeleteStatus = asyncHandler(async (req, res) => {
+      const { product_id } = req.body; // Get product_id from request body
+
+      try {
+        // Validate product_id
+        if (!product_id) {
+          return res.status(400).json({
+            message: "Product ID is required.",
+            status: false,
+          });
+        }
+
+        // Find and update delete_status to false
+        const product = await Product.findByIdAndUpdate(
+          product_id,
+          { delete_status: false }, // Set delete_status to false
+          { new: true } // Return updated product
+        );
+
+        if (!product) {
+          return res.status(404).json({ message: "Product not found", status: false });
+        }
+
+        res.status(200).json({
+          message: "Product delete_status updated successfully.",
+          status: true,
+          product,
+        });
+      } catch (error) {
+        console.error("Error updating delete_status:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+
 const getProducts = asyncHandler(async (req, res) => {
   const supplier_id = req.headers.userID; // Assuming user authentication middleware sets this header
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
@@ -490,4 +526,4 @@ const updateOrderItemStatus = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { addFertilizer, getProducts, editProduct, deleteFertilizer, getFertilizerById, getOrdersBySupplierId, updateOrderItemStatus, getAllFertilizer, getProductsBySupplierId };
+module.exports = { addFertilizer, getProducts, editProduct,updateDeleteStatus, deleteFertilizer, getFertilizerById, getOrdersBySupplierId, updateOrderItemStatus, getAllFertilizer, getProductsBySupplierId };
