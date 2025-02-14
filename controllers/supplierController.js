@@ -579,6 +579,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
   }
 });
 
+
 const getAllProductsInAdmin = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
   const limit = parseInt(req.query.limit) || 10; // Number of products per page, default to 10
@@ -623,6 +624,93 @@ const getAllProductsInAdmin = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", status: false });
   }
 });
+
+// edit by Atest
+// const getAllProductsInAdmin = asyncHandler(async (req, res) => {
+//       const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+//       const limit = parseInt(req.query.limit) || 10; // Number of products per page, default to 10
+//       const search = req.query.search || ""; // Search term
+//       const sortBy = req.query.sortBy || "createdAt"; // Field to sort by, default to 'createdAt'
+//       const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
+
+//       try {
+//         const query = {
+//           product_role: "supplier",
+//           $or: [
+//                         { english_name: { $regex: search, $options: "i" } },
+//                         { local_name: { $regex: search, $options: "i" } },
+//                         { other_name: { $regex: search, $options: "i" } },
+//                         { product_type: { $regex: search, $options: "i" } },
+//                         { product_size: { $regex: search, $options: "i" } },
+//                         { price: isNaN(search) ? null : Number(search) },
+//                         { quantity: isNaN(search) ? null : Number(search) },
+//                       ],
+//         };
+
+//         // Aggregation pipeline to join supplier and category details
+//         const pipeline = [
+//           { $match: query },
+//           {
+//             $lookup: {
+//               from: "users", // Assuming the User collection is named "users"
+//               localField: "supplier_id",
+//               foreignField: "_id",
+//               as: "supplierDetails",
+//             },
+//           },
+//           {
+//             $lookup: {
+//               from: "categories", // Assuming the Category collection is named "categories"
+//               localField: "category_id",
+//               foreignField: "_id",
+//               as: "categoryDetails",
+//             },
+//           },
+//           {
+//             $addFields: {
+//               supplierName: {
+//                 $ifNull: [{ $arrayElemAt: ["$supplierDetails.full_name", 0] }, "Unknown Supplier"],
+//               },
+//               categoryName: {
+//                 $ifNull: [{ $arrayElemAt: ["$categoryDetails.category_name", 0] }, "Unknown Category"],
+//               },
+//             },
+//           },
+//           {
+//             $match: {
+//               $or: [
+//                 { supplierName: { $regex: search, $options: "i" } }, // Search supplier name
+//                 { categoryName: { $regex: search, $options: "i" } }, // Search category name
+//               ],
+//             },
+//           },
+//           { $sort: { [sortBy]: order } },
+//           { $skip: (page - 1) * limit },
+//           { $limit: limit },
+//           {
+//             $project: {
+//               supplierDetails: 0, // Remove supplierDetails array to clean up response
+//               categoryDetails: 0, // Remove categoryDetails array to clean up response
+//             },
+//           },
+//         ];
+
+//         const products = await Product.aggregate(pipeline);
+//         const totalProducts = await Product.countDocuments(query);
+
+//         res.status(200).json({
+//           products,
+//           page,
+//           totalPages: Math.ceil(totalProducts / limit),
+//           totalProducts,
+//           status: true,
+//         });
+//       } catch (error) {
+//         console.error("Error fetching products:", error.message);
+//         res.status(500).json({ message: "Internal Server Error", status: false });
+//       }
+//     });
+
 
 const getProductsBySupplierId = asyncHandler(async (req, res) => {
   const { supplier_id } = req.body; // Assuming user authentication middleware sets this header
@@ -1235,5 +1323,5 @@ module.exports = {
   updateProductDefaultStatus,
   addProductType,
   getProductTypes,
-  deleteSupplierProduct
+  deleteSupplierProduct,
 };

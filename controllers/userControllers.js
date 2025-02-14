@@ -1469,9 +1469,6 @@ const checkout = asyncHandler(async (req, res) => {
   }
 });
 
-
-
-
 const getOrderNotifications = asyncHandler(async (req, res) => {
   const userID = req.headers.userID;
 
@@ -1514,10 +1511,8 @@ const getOrderNotifications = asyncHandler(async (req, res) => {
 //edit by Atest
 
 const generateVerificationCode = () => {
-      return Math.floor(100000 + Math.random() * 900000).toString();
-    };
-
-
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 const generateOrderID = () => {
   const randomNumber = Math.floor(Math.random() * 10000000); // Generate a number between 0 and 9999999
@@ -1981,7 +1976,7 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
     }
 
     // Fetch suppliers based on the query, skip, and limit
-    const suppliers = await User.find(query).skip(skip).limit(limit);
+    const suppliers = await User.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit);
 
     // Get the total number of suppliers that match the query
     const totalSuppliers = await User.countDocuments(query);
@@ -2127,47 +2122,107 @@ const updateProfileDataByAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+
+//comment by Atest
+
+// const getAllDashboardCount = asyncHandler(async (req, res) => {
+//   try {
+//     const supplierCount = await User.countDocuments({ role: { $in: "supplier" } });
+//     const userCount = await User.countDocuments({ role: { $in: "user" } });
+//     const bothCount = await User.countDocuments({ role: { $in: "both" } });
+//     const productCount = await Product.countDocuments({ product_role: "supplier" });
+//     const fertilizerCount = await Product.countDocuments({ product_role: "fertilizer" });
+//     const toolCount = await Product.countDocuments({ product_role: "tools" });
+//     const adminnotifications = await OrderNotification.countDocuments();
+//     const orderCount = await Order.countDocuments();
+//     const transactionAmountSum = await Transaction.aggregate([
+//       {
+//         $group: {
+//           _id: null,
+//           total_amount: { $sum: "$total_amount" }, // Summing the "amount" field
+//         },
+//       },
+//     ]);
+
+//     // Extracting the total sum of the "amount" field
+//     const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].total_amount : 0;
+
+//     res.status(200).json({
+//       supplierCount: supplierCount,
+//       userCount: userCount,
+//       productCount: productCount,
+//       fertilizerCount: fertilizerCount,
+//       toolCount: toolCount,
+//       bothCount: bothCount,
+//       orderCount: orderCount,
+//       adminnotifications: adminnotifications,
+//       transactionTotalAmount: transactionTotalAmount,
+//     });
+//   } catch (error) {
+//     console.error("Error getting dashboard counts:", error);
+//     res.status(500).json({
+//       message: "Internal Server Error",
+//       status: false,
+//     });
+//   }
+// });
+
+// edit by Atest
+
 const getAllDashboardCount = asyncHandler(async (req, res) => {
-  try {
-    const supplierCount = await User.countDocuments({ role: { $in: "supplier" } });
-    const userCount = await User.countDocuments({ role: { $in: "user" } });
-    const bothCount = await User.countDocuments({ role: { $in: "both" } });
-    const productCount = await Product.countDocuments({ product_role: "supplier" });
-    const fertilizerCount = await Product.countDocuments({ product_role: "fertilizer" });
-    const toolCount = await Product.countDocuments({ product_role: "tools" });
-    const adminnotifications = await OrderNotification.countDocuments();
-    const orderCount = await Order.countDocuments();
-    const transactionAmountSum = await Transaction.aggregate([
-      {
-        $group: {
-          _id: null,
-          total_amount: { $sum: "$total_amount" }, // Summing the "amount" field
-        },
-      },
-    ]);
+      try {
+        // Check if token is provided in headers
+        const token = req.headers.authorization;
 
-    // Extracting the total sum of the "amount" field
-    const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].total_amount : 0;
+        if (!token) {
+          return res.status(401).json({
+            message: "Unauthorized: No token provided",
+            status: false,
+          });
+        }
 
-    res.status(200).json({
-      supplierCount: supplierCount,
-      userCount: userCount,
-      productCount: productCount,
-      fertilizerCount: fertilizerCount,
-      toolCount: toolCount,
-      bothCount: bothCount,
-      orderCount: orderCount,
-      adminnotifications: adminnotifications,
-      transactionTotalAmount: transactionTotalAmount,
+        // Proceed with fetching the counts
+        const supplierCount = await User.countDocuments({ role: { $in: "supplier" } });
+        const userCount = await User.countDocuments({ role: { $in: "user" } });
+        const bothCount = await User.countDocuments({ role: { $in: "both" } });
+        const productCount = await Product.countDocuments({ product_role: "supplier" });
+        const fertilizerCount = await Product.countDocuments({ product_role: "fertilizer" });
+        const toolCount = await Product.countDocuments({ product_role: "tools" });
+        const adminnotifications = await OrderNotification.countDocuments();
+        const orderCount = await Order.countDocuments();
+
+        const transactionAmountSum = await Transaction.aggregate([
+          {
+            $group: {
+              _id: null,
+              total_amount: { $sum: "$total_amount" }, // Summing the "total_amount" field
+            },
+          },
+        ]);
+
+        // Extract total transaction amount
+        const transactionTotalAmount = transactionAmountSum.length > 0 ? transactionAmountSum[0].total_amount : 0;
+
+        res.status(200).json({
+          supplierCount,
+          userCount,
+          productCount,
+          fertilizerCount,
+          toolCount,
+          bothCount,
+          orderCount,
+          adminnotifications,
+          transactionTotalAmount,
+        });
+      } catch (error) {
+        console.error("Error getting dashboard counts:", error);
+        res.status(500).json({
+          message: "Internal Server Error",
+          status: false,
+        });
+      }
     });
-  } catch (error) {
-    console.error("Error getting dashboard counts:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      status: false,
-    });
-  }
-});
+
 
 const addReview = asyncHandler(async (req, res) => {
   const my_id = req.user._id;

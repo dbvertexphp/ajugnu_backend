@@ -360,6 +360,8 @@ const getAllTransactionsByTeacher = asyncHandler(async (req, res) => {
 //   }
 // });
 
+//edit by Atest
+
 const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
 
@@ -439,6 +441,10 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", status: false });
   }
 });
+
+
+
+
 
 module.exports = {
   addTransaction,
