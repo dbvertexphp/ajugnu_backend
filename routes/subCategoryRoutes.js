@@ -12,7 +12,7 @@ subCategoryRoutes.route("/GetAllCategoriesAdmin").get(GetAllCategoriesAdmin);
 subCategoryRoutes.route("/GetAllSubCategoriesAdminpage").post(getAllSubCategoriesAdminpage);
 subCategoryRoutes.route("/GetCategoryByName").post(GetSingleCategoryByName);
 subCategoryRoutes.route("/GetSubCategoryByCategoryId").post(getSubCategoryByCategoryId);
-subCategoryRoutes.route("/getSubCategoryByCategoryIdInAdmin/:category_id").get(getSubCategoryByCategoryIdInAdmin);
+subCategoryRoutes.route("/getSubCategoryByCategoryIdInAdmin/:category_id").get(protect, getSubCategoryByCategoryIdInAdmin);
 subCategoryRoutes.route("/DeleteCategory").post(protect, DeleteCategory);
 
 module.exports = { subCategoryRoutes };

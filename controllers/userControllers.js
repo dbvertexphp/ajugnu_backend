@@ -33,6 +33,7 @@ const fs = require("fs");
 const { addNotification } = require("./orderNotificationController");
 const { sendFCMNotification } = require("./notificationControllers");
 const sendEmail = require("../utils/emailSender");
+const argon2 = require('argon2');
 
 const getUsers = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -336,6 +337,63 @@ const authUser = asyncHandler(async (req, res) => {
     throw new ErrorHandler("Invalid Password", 400);
   }
 });
+
+
+const adminLogin = asyncHandler(async (req, res) => {
+      const { mobile, password } = req.body; // Get mobile and password from request body
+
+      // Check if both mobile and password are provided
+      if (!mobile || !password) {
+        return res.status(400).json({ message: 'Please provide both mobile and password.' });
+      }
+
+      // Find the user by mobile number and check if the role is 'admin'
+      const user = await User.findOne({ mobile, role: 'admin' });
+
+      if (!user) {
+        return res.status(400).json({ message: 'Admin not found or invalid credentials.' });
+      }
+
+      // Compare the provided password with the stored hashed password (using argon2)
+      try {
+        const isMatch = await argon2.verify(user.password, password);  // Verify the hashed password with argon2
+
+        if (!isMatch) {
+          return res.status(400).json({ message: 'Invalid password.' });
+        }
+      } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Error comparing passwords. Please try again later.' });
+      }
+
+      // Generate JWT token for the admin, including their role
+      const token = jwt.sign({ _id: user._id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+      // Set the JWT token in a cookie for 1 days
+      res.setHeader(
+            "Set-Cookie",
+            cookie.serialize("Websitetoken", token, {
+              httpOnly: true,
+              expires: new Date(Date.now() + 60 * 60 * 24 * 1000), // 1 day
+              path: "/",
+            })
+          );
+
+      // Send response with user details and the token
+      const userResponse = {
+        ...user.toObject(),
+        profile_pic: user.profile_pic, // Optionally include profile picture
+      };
+
+      res.json({
+        user: userResponse,
+        token,
+        status: true,
+      });
+    });
+
+
+
 
 const logoutUser = asyncHandler(async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -3153,6 +3211,76 @@ const updateUserRole = asyncHandler(async (req, res, next) => {
   }
 });
 
+
+
+
+const change_password = asyncHandler(async (req, res) => {
+      const { oldPassword, newPassword } = req.body;
+
+      // Ensure both old and new passwords are provided
+      if (!oldPassword || !newPassword) {
+        return res.status(400).json({ message: 'Please provide both old and new passwords.' });
+      }
+
+      // Ensure req.user exists (from the verifyToken middleware)
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not authenticated.' });
+      }
+
+      // Find the user by ID (use req.user.id after JWT verification)
+      const user = await User.findById(req.user.id);
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+
+
+
+      // Compare the old password with the stored password (hashed) using argon2
+      try {
+        const isMatch = await argon2.verify(user.password, oldPassword);
+        console.log('Password comparison result:', isMatch);  // Log comparison result
+
+        if (!isMatch) {
+          return res.status(401).json({ message: 'Incorrect old password.' });
+        }
+      } catch (err) {
+        console.error('Error during password comparison:', err);
+        return res.status(500).json({ message: 'Error during password comparison.' });
+      }
+
+      // Optionally validate new password length (uncomment this part if needed)
+      // if (newPassword.length <= 8) {
+      //   return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
+      // }
+
+      try {
+        // Hash the new password using argon2
+        const hashedPassword = await argon2.hash(newPassword);
+        console.log('New password hash (argon2):', hashedPassword);  // Log new hashed password
+
+        // Update the password directly in the database
+        const result = await User.updateOne({ _id: user._id }, { $set: { password: hashedPassword } });
+
+        // Check if update was successful
+        if (result.nModified === 0) {
+          return res.status(500).json({ message: 'Failed to update password in the database.' });
+        }
+
+        // Fetch the user again to verify the password was updated correctly
+        const updatedUser = await User.findById(req.user.id);
+
+
+        // Return success message
+        res.status(200).json({ message: 'Password updated successfully.' });
+      } catch (err) {
+        console.error('Error hashing new password with argon2:', err);
+        res.status(500).json({ message: 'Error hashing the new password.' });
+      }
+});
+
+
+
 const updateCancelOrder = asyncHandler(async (req, res) => {
   const { order_id, new_status } = req.body;
   const user_id = req.headers.userID;
@@ -3517,4 +3645,6 @@ module.exports = {
   sendNotificationToRole,
   getAllBothUsers,
   updateUsersTimestamp,
+  change_password,
+  adminLogin
 };

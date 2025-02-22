@@ -10,7 +10,7 @@ const userSchema = mongoose.Schema(
     },
     mobile: { type: String, unique: true },
     password: { type: String, required: true },
-    role: { type: String, required: true, enum: ["user", "supplier", "both"] },
+    role: { type: String, required: true, enum: ["user", "supplier", "both", "admin"] },
     otp: { type: String },
     otp_verified: { type: Number, default: 0 },
     firebase_token: { type: String, default: "dummy_token" },

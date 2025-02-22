@@ -59,6 +59,8 @@ const {
   sendNotificationToRole,
   getAllBothUsers,
   updateUsersTimestamp,
+  change_password,
+  adminLogin,
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -69,11 +71,13 @@ const { addRating, getRatingsByTeacherId } = require("../controllers/ratingContr
 const { addTeacherPaymentStatus, getTeacherPaymentStatuses, calculatePayment, getTeacherPaymentStatusById } = require("../controllers/teacherPaymentStatusController.js");
 const { getPopularProduct } = require("../controllers/supplierController.js");
 const userRoutes = express.Router();
-
+const verifyToken = require('../middleware/verifytoken.js');
 /*------------- Student/Teacher Both apis --------------------- */
 userRoutes.route("/updateUsersTimestamp").post(updateUsersTimestamp);
 userRoutes.route("/register").post(registerUser);
 userRoutes.route("/login").post(authUser);
+userRoutes.route("/adminlogin").post(adminLogin);
+userRoutes.route("/change-password").put(authUser);
 userRoutes.route("/verifyOtp").post(verifyOtp);
 userRoutes.route("/resendOTP").post(resendOTP);
 userRoutes.route("/ForgetresendOTP").post(ForgetresendOTP);
@@ -115,6 +119,7 @@ userRoutes.route("/getFavoriteTeachers").get(protect, Authorization(["student"])
 userRoutes.route("/getRatingsByTeacherId/:teacherId").get(protect, getRatingsByTeacherId);
 userRoutes.route("/addReview").post(protect, Authorization(["student"]), addReview);
 
+userRoutes.route("/change_password").put(verifyToken, change_password);
 /*------------- Teacher/Admin Both apis --------------------- */
 userRoutes.route("/getTeacherAndCourseByTeacher_IdAndType").post(protect, Authorization(["student", "teacher"]), getTeacherAndCourseByTeacher_IdAndType);
 userRoutes.route("/addBankDetails").post(protect, Authorization(["supplier","both"]), bank_Detail_create);
