@@ -61,6 +61,7 @@ const {
   updateUsersTimestamp,
   change_password,
   adminLogin,
+  getAllSupplierstotal
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -101,7 +102,7 @@ userRoutes.route("/increaseCartQuantity").post(protect, Authorization(["user","b
 userRoutes.route("/decreaseCartQuantity").post(protect, Authorization(["user","both"]), decreaseCartQuantity);
 userRoutes.route("/checkout").post(protect, Authorization(["user","both"]), checkout);
 userRoutes.route("/removeFromCart").post(protect, Authorization(["user","both"]), removeFromCart);
-userRoutes.route("/getUserOrderDetails").get(protect, Authorization(["user","both"]), getUserOrderDetails);
+userRoutes.route("/getUserOrderDetails").get(protect, Authorization(["user","both", "supplier"]), getUserOrderDetails);
 userRoutes.route("/addRating").post(protect, Authorization(["user","both"]), addRating);
 userRoutes.route("/getOrderNotifications").get(protect, Authorization(["user","both"]), getOrderNotifications);
 userRoutes.route("/getPopularProduct").get(protect, Authorization(["user","both"]), getPopularProduct);
@@ -177,7 +178,7 @@ userRoutes.route("/updateProfileDataByAdmin").post(protect, updateProfileDataByA
 userRoutes.route("/getCoursesByTeacherId/:teacher_id").get(protect, getCoursesByTeacherId);
 
 userRoutes.route("/getAllSuppliersInAdmin").get(protect, getAllSuppliersInAdmin);
-
+userRoutes.route("/getAllSupplierstotal").get(protect, getAllSupplierstotal);
 
 userRoutes.route("/updateNumberToString").post(updateNumberToString);
 userRoutes.route("/updatePinCodeToString").post(updatePinCodeToString);

@@ -35,6 +35,7 @@ const { sendFCMNotification } = require("./notificationControllers");
 const sendEmail = require("../utils/emailSender");
 const argon2 = require('argon2');
 
+
 const getUsers = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   try {
@@ -318,7 +319,7 @@ const authUser = asyncHandler(async (req, res) => {
       "Set-Cookie",
       cookie.serialize("Websitetoken", token, {
         httpOnly: true,
-        expires: new Date(Date.now() + 60 * 60 * 24 * 30 * 1000), // 30 days
+        expires: new Date(Date.now() + 60 * 60 * 24 * 1000), // 1 days
         path: "/",
       })
     );
@@ -1769,6 +1770,7 @@ const getUserOrderInAdmin = asyncHandler(async (req, res) => {
 
 const getUserOrderDetails = asyncHandler(async (req, res) => {
   const userID = req.headers.userID;
+  console.log(userID);
 
   try {
     // Validate userID
@@ -2025,7 +2027,7 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
 
     // Construct the query to search by full_name, email, or mobile and filter by role 'supplier'
     let query = {
-      role: "supplier",
+      role: "supplier" ,
     };
 
     // Add $or condition only if there is a search term
@@ -2054,6 +2056,78 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
     });
   }
 });
+
+const getAllSupplierstotal = asyncHandler(async (req, res) => {
+      try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Fetch transactions and populate supplier information for the items array
+        const transactions = await Transaction.aggregate([
+          {
+            $unwind: "$items" // Unwind the items array to process each item separately
+          },
+          {
+            $group: {
+              _id: "$items.supplier_id", // Group by the supplier_id in the items array
+              totalAmount: { $sum: "$items.amount" }, // Sum the amounts for each supplier
+              transactions: { $push: "$$ROOT" }, // Push the entire transaction document to track it
+            }
+          },
+          {
+            $lookup: {
+              from: "users", // Lookup the user model for supplier information
+              localField: "_id", // Match the _id of supplier_id in the items array
+              foreignField: "_id",
+              as: "supplier_info"
+            }
+          },
+          {
+            $unwind: "$supplier_info" // Unwind the supplier_info to have each transaction's supplier data
+          },
+          {
+            $skip: skip // Pagination: skip results for the current page
+          },
+          {
+            $limit: limit // Limit results per page
+          },
+          {
+            $project: {
+              _id: 1,
+              totalAmount: 1,
+              transactions: 1,
+              supplier_name: "$supplier_info.full_name", // Supplier's name
+              supplier_email: "$supplier_info.email", // Supplier's email
+              supplier_mobile: "$supplier_info.mobile", // Supplier's mobile
+            }
+          }
+        ]);
+
+        // Get the total number of transactions for pagination
+        const totalTransactions = await Transaction.countDocuments();
+
+        // Return the results with pagination details
+        res.json({
+          Suppliers: transactions,
+          total_rows: totalTransactions,
+          current_page: page,
+          total_pages: Math.ceil(totalTransactions / limit),
+        });
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+        res.status(500).json({
+          message: "Internal Server Error",
+          status: false,
+        });
+      }
+    });
+
+
+
+
+
+
 
 const getAllBothUsers = asyncHandler(async (req, res) => {
   try {
@@ -3646,5 +3720,6 @@ module.exports = {
   getAllBothUsers,
   updateUsersTimestamp,
   change_password,
-  adminLogin
+  adminLogin,
+  getAllSupplierstotal
 };
