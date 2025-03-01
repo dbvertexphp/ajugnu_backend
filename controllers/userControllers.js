@@ -1197,104 +1197,73 @@ const getProductDetailByProductId = asyncHandler(async (req, res) => {
 
 // edit by Atest
 
+
+
 const getCartProducts = asyncHandler(async (req, res) => {
-  const userID = req.headers.userID;
+      const userID = req.headers.userID;
 
-  try {
-    // Validate that userID exists in the headers
-    if (!userID) {
-      console.log("No userID found in the headers.");
-      return res.status(400).json({ message: "User ID is required", status: false });
-    }
+      try {
+        // Validate that userID exists in the headers
+        if (!userID) {
+          console.log("No userID found in the headers.");
+          return res.status(400).json({ message: "User ID is required", status: false });
+        }
 
-    // Check if the userID is a valid ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(userID)) {
-      console.log(`Invalid userID format: ${userID}`);
-      return res.status(400).json({ message: "Invalid User ID format", status: false });
-    }
+        // Check if the userID is a valid ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(userID)) {
+          console.log(`Invalid userID format: ${userID}`);
+          return res.status(400).json({ message: "Invalid User ID format", status: false });
+        }
 
-    // Try to find cart items for the given userID
-    console.log(`Finding cart items for userID: ${userID}`);
-    const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+        // Find cart items for the given userID with additional conditions
+        console.log(`Finding cart items for userID: ${userID}`);
+        const cartItems = await Cart.find({
+          user_id: userID,
+        })
+        .populate({
+          path: "product_id",
+          match: { delete_status: true,  quantity: { $gt: 0 } } // Quantity should be greater than 0 } // Only populate products where delete_status is true
+        });
 
-    // Log the cartItems to check the results
-    console.log("Cart Items:", cartItems);
+        // Filter out cart items where the product_id is null (i.e., product didn't match delete_status)
+        console.log(cartItems);
+        const filteredCartItems = cartItems.filter(item => item.product_id);
 
-    if (!cartItems || cartItems.length === 0) {
-      console.log("No cart items found for this user.");
-      return res.status(404).json({ message: "No items found in cart", status: false });
-    }
+        // Log the filtered cart items
+        console.log("Filtered Cart Items:", filteredCartItems);
 
-    // Calculate total amount
-    let totalAmount = 0;
-    cartItems.forEach((item) => {
-      // Check if product_id exists before accessing price
-      if (item.product_id && item.product_id.price) {
-        console.log(`Calculating for item: ${item.product_id.name}`);
-        totalAmount += item.product_id.price * item.quantity;
-      } else {
-        console.log(`Skipping item due to missing price or product_id: ${item._id}`);
+        if (!filteredCartItems || filteredCartItems.length === 0) {
+          console.log("No valid cart items found for this user.");
+          return res.status(404).json({ message: "No valid items found in cart", status: false });
+        }
+
+        // Calculate total amount
+        let totalAmount = 0;
+        filteredCartItems.forEach((item) => {
+          if (item.product_id && item.product_id.price) {
+            console.log(`Calculating for item: ${item.product_id.name}`);
+            totalAmount += item.product_id.price * item.quantity;
+          } else {
+            console.log(`Skipping item due to missing price or product_id: ${item._id}`);
+          }
+        });
+
+        // Return success response
+        console.log(`Total amount calculated: ${totalAmount}`);
+        res.status(200).json({
+          status: true,
+          message: "Cart items retrieved successfully",
+          cartItems: filteredCartItems,
+          totalAmount,
+        });
+      } catch (error) {
+        // Enhanced error logging
+        console.error("Error in getCartProducts:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
       }
     });
 
-    // Return success response
-    console.log(`Total amount calculated: ${totalAmount}`);
-    res.status(200).json({
-      status: true,
-      message: "Cart items retrieved successfully",
-      cartItems,
-      totalAmount,
-    });
-  } catch (error) {
-    // Enhanced error logging
-    console.error("Error in getCartProducts:", error);
-    res.status(500).json({ error: "Internal Server Error", details: error.message });
-  }
-});
 
-// const getCartProducts = asyncHandler(async (req, res) => {
-//   const userID = req.headers.userID;
-
-//   try {
-//     if (!userID) {
-//       return res.status(400).json({ message: "User ID is required", status: false });
-//     }
-
-//     if (!mongoose.Types.ObjectId.isValid(userID)) {
-//       return res.status(400).json({ message: "Invalid User ID format", status: false });
-//     }
-
-//     console.log(`Finding cart items for userID: ${userID}`);
-
-//     const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
-
-//     // Remove items where product_id is null (population failure)
-//     const validCartItems = cartItems.filter((item) => item.product_id !== null);
-
-//     if (!validCartItems.length) {
-//       return res.status(404).json({ message: "No items found in cart", status: false });
-//     }
-
-//     let totalAmount = 0;
-//     validCartItems.forEach((item) => {
-//       if (item.product_id?.price) {
-//         totalAmount += item.product_id.price * item.quantity;
-//       }
-//     });
-
-//     res.status(200).json({
-//       status: true,
-//       message: "Cart items retrieved successfully",
-//       cartItems: validCartItems,
-//       totalAmount,
-//     });
-//   } catch (error) {
-//     console.error("Error in getCartProducts:", error);
-//     res.status(500).json({ error: "Internal Server Error", details: error.message });
-//   }
-// });
-
-// end
 
 const increaseCartQuantity = asyncHandler(async (req, res) => {
   const { product_id, quantity } = req.body;
@@ -1386,147 +1355,261 @@ const decreaseCartQuantity = asyncHandler(async (req, res) => {
   }
 });
 
+// const checkout = asyncHandler(async (req, res) => {
+//   const userID = req.headers.userID;
+//   const { shipping_address, payment_method } = req.body;
+
+//   try {
+//     // Validate userID, shipping_address, and payment_method (as before)
+
+//     // Find all cart items for the user
+//     const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+
+//     if (!cartItems || cartItems.length === 0) {
+//       return res.status(404).json({ message: "No items found in cart", status: false });
+//     }
+
+//     // Calculate total amount and validate stock
+//     let totalAmount = 0;
+//     const verificationCodes = {};
+//     const supplierIds = new Set(); // Create a Set to collect unique supplier IDs
+
+//     const items = cartItems.map((item) => {
+//       if (item.quantity > item.product_id.quantity) {
+//         return res.status(400).json({ message: `Requested quantity for ${item.product_id.english_name} exceeds available stock`, status: false });
+//       }
+//       totalAmount += item.product_id.price * item.quantity;
+
+//       // Add supplier ID to the Set
+//       supplierIds.add(item.product_id.supplier_id.toString());
+
+//       // Generate a unique verification code for each supplier_id
+//       const supplierId = item.product_id.supplier_id.toString();
+//       if (!verificationCodes[supplierId]) {
+//         verificationCodes[supplierId] = generateVerificationCode();
+//       }
+
+//       return {
+//         product_id: item.product_id._id,
+//         quantity: item.quantity,
+//         supplier_id: supplierId,
+//         verification_code: verificationCodes[supplierId],
+//         status: "order",
+//       };
+//     });
+
+//     // Generate a unique order ID and create the order (as before)
+//     const orderId = generateOrderID();
+
+//     const order = new Order({
+//       order_id: orderId,
+//       user_id: userID,
+//       items,
+//       shipping_address,
+//       payment_method,
+//       total_amount: totalAmount,
+//     });
+
+//     const savedOrder = await order.save();
+
+//     // Send notification to the user
+//     const user = await User.findById(userID);
+//     if (user.firebase_token || user.firebase_token == "dummy_token") {
+//       const registrationToken = user.firebase_token;
+//       const title = "Order Placed";
+//       const body = `Your order has been successfully placed!`;
+
+//       const notificationResult = await sendFCMNotification(registrationToken, title, body);
+//       if (notificationResult.success) {
+//         console.log("Notification sent successfully:", notificationResult.response);
+//       } else {
+//         console.error("Failed to send notification:", notificationResult.error);
+//       }
+
+//       // Pass supplier IDs as an array to the addNotification function
+//       await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, null, title, "order");
+//     }
+
+//     // Send email
+//     const sendEmailAsync = async () => {
+//       const subject = "Thank You for Your Purchase!";
+//       const text = `Hello ${user.full_name},\n\nThank you for your purchase! We appreciate your business. If you have any questions or need assistance, feel free to reach out to us.`;
+
+//       try {
+//         await sendEmail(user.email, subject, text); // Send email after user registration
+//       } catch (error) {
+//         console.error("Failed to send email notification:", error);
+//       }
+//     };
+
+//     // Schedule the email to be sent
+//     setImmediate(sendEmailAsync);
+
+//     // Send notification to each supplier
+//     const supplierArray = Array.from(supplierIds);
+//     const suppliers = await User.find({ _id: { $in: supplierArray } });
+
+//     for (const supplier of suppliers) {
+//       if (supplier.firebase_token || supplier.firebase_token == "dummy_token") {
+//         const supplierToken = supplier.firebase_token;
+//         const supplierTitle = "Product Sold";
+//         const supplierBody = `A product has been purchased from your inventory!`;
+
+//         const supplierNotificationResult = await sendFCMNotification(supplierToken, supplierTitle, supplierBody);
+//         if (supplierNotificationResult.success) {
+//           console.log("Notification sent successfully to supplier:", supplierNotificationResult.response);
+//         } else {
+//           console.error("Failed to send notification to supplier:", supplierNotificationResult.error);
+//         }
+//         await addNotification(savedOrder.user_id, savedOrder._id, supplierBody, savedOrder.total_amount, Array.from(supplierIds), supplierTitle, "order");
+//       }
+
+//       // Send email
+//       const sendEmailAsync = async () => {
+//         const subject = "Thank You for Your Purchase!";
+//         const text = `Hello ${supplier.full_name},\n\nThank you for your purchase! We appreciate your business. If you have any questions or need assistance, feel free to reach out to us.`;
+
+//         try {
+//           await sendEmail(supplier.email, subject, text); // Send email after user registration
+//         } catch (error) {
+//           console.error("Failed to send email notification:", error);
+//         }
+//       };
+
+//       // Schedule the email to be sent
+//       setImmediate(sendEmailAsync);
+//     }
+
+//     // Update product stock and clear user's cart (as before)
+//     for (const item of cartItems) {
+//       await Product.findByIdAndUpdate(item.product_id._id, { $inc: { quantity: -item.quantity } });
+//     }
+//     await Cart.deleteMany({ user_id: userID });
+
+//     res.status(201).json({
+//       status: true,
+//       message: "Order placed successfully",
+//       order: savedOrder,
+//     });
+//   } catch (error) {
+//     console.error("Error during checkout:", error.message);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
+
+// edit by Atest
+
+
+
+
 const checkout = asyncHandler(async (req, res) => {
-  const userID = req.headers.userID;
-  const { shipping_address, payment_method } = req.body;
-
-  try {
-    // Validate userID, shipping_address, and payment_method (as before)
-
-    // Find all cart items for the user
-    const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
-
-    if (!cartItems || cartItems.length === 0) {
-      return res.status(404).json({ message: "No items found in cart", status: false });
-    }
-
-    // Calculate total amount and validate stock
-    let totalAmount = 0;
-    const verificationCodes = {};
-    const supplierIds = new Set(); // Create a Set to collect unique supplier IDs
-
-    const items = cartItems.map((item) => {
-      if (item.quantity > item.product_id.quantity) {
-        return res.status(400).json({ message: `Requested quantity for ${item.product_id.english_name} exceeds available stock`, status: false });
-      }
-      totalAmount += item.product_id.price * item.quantity;
-
-      // Add supplier ID to the Set
-      supplierIds.add(item.product_id.supplier_id.toString());
-
-      // Generate a unique verification code for each supplier_id
-      const supplierId = item.product_id.supplier_id.toString();
-      if (!verificationCodes[supplierId]) {
-        verificationCodes[supplierId] = generateVerificationCode();
-      }
-
-      return {
-        product_id: item.product_id._id,
-        quantity: item.quantity,
-        supplier_id: supplierId,
-        verification_code: verificationCodes[supplierId],
-        status: "order",
-      };
-    });
-
-    // Generate a unique order ID and create the order (as before)
-    const orderId = generateOrderID();
-
-    const order = new Order({
-      order_id: orderId,
-      user_id: userID,
-      items,
-      shipping_address,
-      payment_method,
-      total_amount: totalAmount,
-    });
-
-    const savedOrder = await order.save();
-
-    // Send notification to the user
-    const user = await User.findById(userID);
-    if (user.firebase_token || user.firebase_token == "dummy_token") {
-      const registrationToken = user.firebase_token;
-      const title = "Order Placed";
-      const body = `Your order has been successfully placed!`;
-
-      const notificationResult = await sendFCMNotification(registrationToken, title, body);
-      if (notificationResult.success) {
-        console.log("Notification sent successfully:", notificationResult.response);
-      } else {
-        console.error("Failed to send notification:", notificationResult.error);
-      }
-
-      // Pass supplier IDs as an array to the addNotification function
-      await addNotification(savedOrder.user_id, savedOrder._id, body, savedOrder.total_amount, null, title, "order");
-    }
-
-    // Send email
-    const sendEmailAsync = async () => {
-      const subject = "Thank You for Your Purchase!";
-      const text = `Hello ${user.full_name},\n\nThank you for your purchase! We appreciate your business. If you have any questions or need assistance, feel free to reach out to us.`;
+      const userID = req.headers.userID;
+      const { shipping_address, payment_method } = req.body;
 
       try {
-        await sendEmail(user.email, subject, text); // Send email after user registration
+        // Validate required fields
+        if (!userID || !shipping_address || !payment_method) {
+          return res.status(400).json({ message: "Missing required fields", status: false });
+        }
+
+        // Fetch all cart items for the user
+        const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+
+        if (!cartItems || cartItems.length === 0) {
+          return res.status(404).json({ message: "No items found in cart", status: false });
+        }
+
+        let totalAmount = 0;
+        const verificationCodes = {};
+        const supplierIds = new Set();
+        const items = [];
+
+        // **Check for deleted or out-of-stock products**
+        for (const item of cartItems) {
+          const product = item.product_id;
+
+          if (!product) {
+            return res.status(400).json({ message: "Some products are missing or unavailable", status: false });
+          }
+
+          if (product.delete_status === false ) {
+            return res.status(400).json({
+              message: `Product "${product.english_name}" is deleted and cannot be purchased.`,
+              status: false,
+            });
+          }
+
+          if (product.quantity <= 0) {
+            return res.status(400).json({
+              message: `Product "${product.english_name}" is out of stock and cannot be purchased.`,
+              status: false,
+            });
+          }
+
+          // Ensure requested quantity does not exceed available stock
+          if (item.quantity > product.quantity) {
+            return res.status(400).json({
+              message: `Requested quantity for "${product.english_name}" exceeds available stock.`,
+              status: false,
+            });
+          }
+
+          totalAmount += product.price * item.quantity;
+          supplierIds.add(product.supplier_id.toString());
+
+          // Generate unique verification code for supplier
+          const supplierId = product.supplier_id.toString();
+          if (!verificationCodes[supplierId]) {
+            verificationCodes[supplierId] = generateVerificationCode();
+          }
+
+          items.push({
+            product_id: product._id,
+            quantity: item.quantity,
+            supplier_id: supplierId,
+            verification_code: verificationCodes[supplierId],
+            status: "order",
+          });
+        }
+
+        // **Proceed with Order Creation (same as your existing logic)**
+        const orderId = generateOrderID();
+        const order = new Order({
+          order_id: orderId,
+          user_id: userID,
+          items,
+          shipping_address,
+          payment_method,
+          total_amount: totalAmount,
+        });
+
+        const savedOrder = await order.save();
+
+        // **Notify User & Suppliers (same as your existing logic)**
+
+        // **Update Product Stock**
+        for (const item of cartItems) {
+          await Product.findByIdAndUpdate(item.product_id._id, {
+            $inc: { quantity: -item.quantity }
+          });
+        }
+
+        // **Clear Cart**
+        await Cart.deleteMany({ user_id: userID });
+
+        res.status(201).json({
+          status: true,
+          message: "Order placed successfully",
+          order: savedOrder,
+        });
+
       } catch (error) {
-        console.error("Failed to send email notification:", error);
+        console.error("Error during checkout:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
       }
-    };
-
-    // Schedule the email to be sent
-    setImmediate(sendEmailAsync);
-
-    // Send notification to each supplier
-    const supplierArray = Array.from(supplierIds);
-    const suppliers = await User.find({ _id: { $in: supplierArray } });
-
-    for (const supplier of suppliers) {
-      if (supplier.firebase_token || supplier.firebase_token == "dummy_token") {
-        const supplierToken = supplier.firebase_token;
-        const supplierTitle = "Product Sold";
-        const supplierBody = `A product has been purchased from your inventory!`;
-
-        const supplierNotificationResult = await sendFCMNotification(supplierToken, supplierTitle, supplierBody);
-        if (supplierNotificationResult.success) {
-          console.log("Notification sent successfully to supplier:", supplierNotificationResult.response);
-        } else {
-          console.error("Failed to send notification to supplier:", supplierNotificationResult.error);
-        }
-        await addNotification(savedOrder.user_id, savedOrder._id, supplierBody, savedOrder.total_amount, Array.from(supplierIds), supplierTitle, "order");
-      }
-
-      // Send email
-      const sendEmailAsync = async () => {
-        const subject = "Thank You for Your Purchase!";
-        const text = `Hello ${supplier.full_name},\n\nThank you for your purchase! We appreciate your business. If you have any questions or need assistance, feel free to reach out to us.`;
-
-        try {
-          await sendEmail(supplier.email, subject, text); // Send email after user registration
-        } catch (error) {
-          console.error("Failed to send email notification:", error);
-        }
-      };
-
-      // Schedule the email to be sent
-      setImmediate(sendEmailAsync);
-    }
-
-    // Update product stock and clear user's cart (as before)
-    for (const item of cartItems) {
-      await Product.findByIdAndUpdate(item.product_id._id, { $inc: { quantity: -item.quantity } });
-    }
-    await Cart.deleteMany({ user_id: userID });
-
-    res.status(201).json({
-      status: true,
-      message: "Order placed successfully",
-      order: savedOrder,
     });
-  } catch (error) {
-    console.error("Error during checkout:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+
 
 const getOrderNotifications = asyncHandler(async (req, res) => {
   const userID = req.headers.userID;
@@ -1578,52 +1661,232 @@ const generateOrderID = () => {
   return `#${randomNumber.toString().padStart(7, "0")}`; // Pad with leading zeros to ensure it has 7 digits
 };
 
+// const getAllOrders = asyncHandler(async (req, res) => {
+//   const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+//   const limit = parseInt(req.query.limit) || 10; // Number of orders per page, default to 10
+//   const search = req.query.search || ""; // Search term
+//   const sortBy = req.query.sortBy || "created_at"; // Field to sort by, default to 'createdAt'
+//   const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
+
+//   try {
+//     const query = search
+//       ? {
+//           $or: [{ "shipping_address.name": { $regex: search, $options: "i" } }, { payment_method: { $regex: search, $options: "i" } }, { order_id: { $regex: search, $options: "i" } }],
+//         }
+//       : {};
+
+//     const totalOrders = await Order.countDocuments(query);
+//     const orders = await Order.find(query)
+//       .sort({ [sortBy]: order })
+//       .skip((page - 1) * limit)
+//       .limit(limit)
+//       .populate("user_id", "full_name email") // Populate user details
+//       .populate("items.product_id", "english_name price") // Populate product details
+//       .populate("items.supplier_id", "full_name"); // Populate supplier details
+
+//     // Fetch payment status from the Transaction collection
+//     const ordersWithPaymentStatus = await Promise.all(
+//       orders.map(async (order) => {
+//         const transaction = await Transaction.findOne({ order_id: order._id });
+//         return {
+//           ...order.toObject(),
+//           payment_status: transaction ? transaction.payment_status : "Cash",
+//         };
+//       })
+//     );
+
+//     res.status(200).json({
+//       orders: ordersWithPaymentStatus,
+//       page,
+//       totalPages: Math.ceil(totalOrders / limit),
+//       totalOrders,
+//       status: true,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching orders:", error.message);
+//     res.status(500).json({ message: "Internal Server Error", status: false });
+//   }
+// });
+
+
+
 const getAllOrders = asyncHandler(async (req, res) => {
-  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
-  const limit = parseInt(req.query.limit) || 10; // Number of orders per page, default to 10
-  const search = req.query.search || ""; // Search term
-  const sortBy = req.query.sortBy || "created_at"; // Field to sort by, default to 'createdAt'
-  const order = req.query.order === "asc" ? 1 : -1; // Sorting order, default to descending
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search || "";
+      const sortBy = req.query.sortBy || "created_at";
+      const order = req.query.order === "asc" ? 1 : -1;
 
-  try {
-    const query = search
-      ? {
-          $or: [{ "shipping_address.name": { $regex: search, $options: "i" } }, { payment_method: { $regex: search, $options: "i" } }, { order_id: { $regex: search, $options: "i" } }],
-        }
-      : {};
+      try {
+        const query = search
+          ? {
+              $or: [
+                { "shipping_address.name": { $regex: search, $options: "i" } },
+                { payment_method: { $regex: search, $options: "i" } },
+                { order_id: { $regex: search, $options: "i" } }
+              ]
+            }
+          : {};
 
-    const totalOrders = await Order.countDocuments(query);
-    const orders = await Order.find(query)
-      .sort({ [sortBy]: order })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate("user_id", "full_name email") // Populate user details
-      .populate("items.product_id", "english_name price") // Populate product details
-      .populate("items.supplier_id", "full_name"); // Populate supplier details
+        const totalOrders = await Order.countDocuments(query);
 
-    // Fetch payment status from the Transaction collection
-    const ordersWithPaymentStatus = await Promise.all(
-      orders.map(async (order) => {
-        const transaction = await Transaction.findOne({ order_id: order._id });
-        return {
-          ...order.toObject(),
-          payment_status: transaction ? transaction.payment_status : "Cash",
-        };
-      })
-    );
+        const orders = await Order.aggregate([
+          { $match: query },
+          { $sort: { [sortBy]: order } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: "users",
+              localField: "user_id",
+              foreignField: "_id",
+              as: "user"
+            }
+          },
+          { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+          { $unwind: "$items" },
+          {
+            $lookup: {
+              from: "users",
+              localField: "items.supplier_id",
+              foreignField: "_id",
+              as: "supplier"
+            }
+          },
+          { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: "transactions",
+              localField: "_id",
+              foreignField: "order_id",
+              as: "transaction"
+            }
+          },
+          { $unwind: { path: "$transaction", preserveNullAndEmptyArrays: true } },
+          {
+            $project: {
+              order_id: 1,
+              total_amount: 1,
+              payment_method: 1,
+              created_at: {
+                $dateToString: { format: "%Y-%m-%d %H:%M:%S", date: "$created_at" }
+              },
+              user_name: { $ifNull: ["$user.full_name", "N/A"] },
+              user_email: "$user.email",
+              user_mobile: "$user.mobile",
+              item_status: "$items.status",
+              product_id: "$items.product_id",
+              quantity: "$items.quantity",
+              verification_code: "$items.verification_code",
+              supplier_name: "$supplier.full_name",
+              payment_status: { $ifNull: ["$transaction.payment_status", "Cash"] }
+            }
+          }
+        ]);
 
-    res.status(200).json({
-      orders: ordersWithPaymentStatus,
-      page,
-      totalPages: Math.ceil(totalOrders / limit),
-      totalOrders,
-      status: true,
+        res.status(200).json({
+          orders,
+          page,
+          totalPages: Math.ceil(totalOrders / limit),
+          totalOrders,
+          status: true
+        });
+      } catch (error) {
+        console.error("Error fetching orders:", error.message);
+        res.status(500).json({ message: "Internal Server Error", status: false });
+      }
     });
-  } catch (error) {
-    console.error("Error fetching orders:", error.message);
-    res.status(500).json({ message: "Internal Server Error", status: false });
-  }
-});
+
+const getAllCancelOrders = asyncHandler(async (req, res) => {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search || "";
+      const sortBy = req.query.sortBy || "created_at";
+      const order = req.query.order === "asc" ? 1 : -1;
+
+      try {
+        const query = search
+          ? {
+              $or: [
+                { "shipping_address.name": { $regex: search, $options: "i" } },
+                { payment_method: { $regex: search, $options: "i" } },
+                { order_id: { $regex: search, $options: "i" } }
+              ]
+            }
+          : {};
+
+        const totalOrders = await Order.countDocuments(query);
+
+        const orders = await Order.aggregate([
+          { $match: query },
+          { $match: { "items.status": "cancelled" } },
+          { $sort: { [sortBy]: order } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: "users",
+              localField: "user_id",
+              foreignField: "_id",
+              as: "user"
+            }
+          },
+          { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+          { $unwind: "$items" },
+          {
+            $lookup: {
+              from: "users",
+              localField: "items.supplier_id",
+              foreignField: "_id",
+              as: "supplier"
+            }
+          },
+          { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: "transactions",
+              localField: "_id",
+              foreignField: "order_id",
+              as: "transaction"
+            }
+          },
+          { $unwind: { path: "$transaction", preserveNullAndEmptyArrays: true } },
+          {
+            $project: {
+              order_id: 1,
+              total_amount: 1,
+              payment_method: 1,
+              created_at: {
+                $dateToString: { format: "%Y-%m-%d %H:%M:%S", date: "$created_at" }
+              },
+              user_name: { $ifNull: ["$user.full_name", "N/A"] },
+              user_email: "$user.email",
+              user_mobile: "$user.mobile",
+              item_status: "$items.status",
+              product_id: "$items.product_id",
+              quantity: "$items.quantity",
+              verification_code: "$items.verification_code",
+              supplier_name: "$supplier.full_name",
+              payment_status: { $ifNull: ["$transaction.payment_status", "Cash"] }
+            }
+          }
+        ]);
+
+        res.status(200).json({
+          orders,
+          page,
+          totalPages: Math.ceil(totalOrders / limit),
+          totalOrders,
+          status: true
+        });
+      } catch (error) {
+        console.error("Error fetching orders:", error.message);
+        res.status(500).json({ message: "Internal Server Error", status: false });
+      }
+    });
+
+
+
 
 const getProductsByOrderAndSupplier = asyncHandler(async (req, res) => {
   const { order_id } = req.params;
@@ -2057,72 +2320,73 @@ const getAllSuppliersInAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+
 const getAllSupplierstotal = asyncHandler(async (req, res) => {
       try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        // Fetch transactions and populate supplier information for the items array
-        const transactions = await Transaction.aggregate([
+        // Aggregate order data to calculate total amount per supplier only for delivered items
+        const suppliersTotal = await Order.aggregate([
+          { $unwind: "$items" }, // Flatten items array
+
           {
-            $unwind: "$items" // Unwind the items array to process each item separately
+            $match: { "items.status": "delivered" } // Only include delivered items
           },
+
           {
             $group: {
-              _id: "$items.supplier_id", // Group by the supplier_id in the items array
-              totalAmount: { $sum: "$items.amount" }, // Sum the amounts for each supplier
-              transactions: { $push: "$$ROOT" }, // Push the entire transaction document to track it
+              _id: "$items.supplier_id", // Group by supplier_id
+              totalAmount: { $sum: "$total_amount" } // Sum only for delivered orders
             }
           },
+
           {
             $lookup: {
-              from: "users", // Lookup the user model for supplier information
-              localField: "_id", // Match the _id of supplier_id in the items array
+              from: "users", // Join with users collection
+              localField: "_id",
               foreignField: "_id",
               as: "supplier_info"
             }
           },
-          {
-            $unwind: "$supplier_info" // Unwind the supplier_info to have each transaction's supplier data
-          },
-          {
-            $skip: skip // Pagination: skip results for the current page
-          },
-          {
-            $limit: limit // Limit results per page
-          },
+
+          { $unwind: "$supplier_info" }, // Convert supplier_info array to object
+
+          { $skip: skip }, // Pagination
+          { $limit: limit },
+
           {
             $project: {
               _id: 1,
               totalAmount: 1,
-              transactions: 1,
-              supplier_name: "$supplier_info.full_name", // Supplier's name
-              supplier_email: "$supplier_info.email", // Supplier's email
-              supplier_mobile: "$supplier_info.mobile", // Supplier's mobile
+              supplier_name: "$supplier_info.full_name",
+              supplier_email: "$supplier_info.email",
+              supplier_mobile: "$supplier_info.mobile"
             }
           }
         ]);
 
-        // Get the total number of transactions for pagination
-        const totalTransactions = await Transaction.countDocuments();
+        // Get the total count of suppliers who have delivered orders
+        const totalSuppliers = await Order.aggregate([
+          { $unwind: "$items" },
+          { $match: { "items.status": "delivered" } }, // Only delivered items
+          { $group: { _id: "$items.supplier_id" } },
+          { $count: "totalSuppliers" }
+        ]);
 
-        // Return the results with pagination details
         res.json({
-          Suppliers: transactions,
-          total_rows: totalTransactions,
+          Suppliers: suppliersTotal,
+          total_rows: totalSuppliers.length > 0 ? totalSuppliers[0].totalSuppliers : 0,
           current_page: page,
-          total_pages: Math.ceil(totalTransactions / limit),
+          total_pages: Math.ceil((totalSuppliers.length > 0 ? totalSuppliers[0].totalSuppliers : 0) / limit)
         });
+
       } catch (error) {
-        console.error('Error fetching transactions:', error);
-        res.status(500).json({
-          message: "Internal Server Error",
-          status: false,
-        });
+        console.error("Error fetching supplier totals:", error);
+        res.status(500).json({ message: "Internal Server Error", status: false });
       }
     });
-
 
 
 
@@ -2317,7 +2581,11 @@ const getAllDashboardCount = asyncHandler(async (req, res) => {
         const supplierCount = await User.countDocuments({ role: { $in: "supplier" } });
         const userCount = await User.countDocuments({ role: { $in: "user" } });
         const bothCount = await User.countDocuments({ role: { $in: "both" } });
-        const productCount = await Product.countDocuments({ product_role: "supplier" });
+      //   const productCount = await Product.countDocuments({ product_role: "supplier" });
+      const productCount = await Product.countDocuments({
+            product_role: "supplier",
+            delete_status: true
+          });
         const fertilizerCount = await Product.countDocuments({ product_role: "fertilizer" });
         const toolCount = await Product.countDocuments({ product_role: "tools" });
         const adminnotifications = await OrderNotification.countDocuments();
@@ -3721,5 +3989,6 @@ module.exports = {
   updateUsersTimestamp,
   change_password,
   adminLogin,
-  getAllSupplierstotal
+  getAllSupplierstotal,
+  getAllCancelOrders
 };

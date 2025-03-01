@@ -11,7 +11,7 @@ const protect = asyncHandler(async (req, res, next) => {
   try {
     if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
       token = req.headers.authorization.split(" ")[1];
-      console.log("token", token);
+      // console.log("token", token);
       // Check if the token is blacklisted
       if (isTokenBlacklisted(token)) {
         return res.status(200).json({
@@ -23,12 +23,10 @@ const protect = asyncHandler(async (req, res, next) => {
 
       // Decode token id
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log(decoded);
       const user = await User.findById(decoded._id).select("-password");
       req.headers.userID = decoded._id;
       req.headers.role = decoded.role;
       req.user = user;
-      console.log(req.headers.role)
       next();
     }
   } catch (error) {

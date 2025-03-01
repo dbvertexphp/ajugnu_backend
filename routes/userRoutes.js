@@ -61,7 +61,8 @@ const {
   updateUsersTimestamp,
   change_password,
   adminLogin,
-  getAllSupplierstotal
+  getAllSupplierstotal,
+  getAllCancelOrders
 } = require("../controllers/userControllers.js");
 const { CreateCalendar, GetSpecialEntries, FindPriceByDateTime, GetNormalEntries } = require("../controllers/calendarControllers.js");
 const { createHire, getHireListByUserId, updateHireStatus, getAllHireList, getHireByMe, HirePaymentUpdateStatus } = require("../controllers/hireControllers.js");
@@ -130,6 +131,7 @@ userRoutes.route("/calculatePayment").post(protect, Authorization(["supplier","b
 
 /*------------- Admin apis --------------------- */
 userRoutes.route("/getAllOrders").get(protect, Authorization(["admin"]), getAllOrders);
+userRoutes.route("/getAllCancelOrders").get(protect, Authorization(["admin"]), getAllCancelOrders);
 userRoutes.route("/getUserOrderInAdmin").post(protect, Authorization(["admin"]), getUserOrderInAdmin);
 userRoutes.route("/getProductsByOrderAndSupplier/:order_id").get(protect, Authorization(["admin"]), getProductsByOrderAndSupplier);
 userRoutes.route("/getUserDetails").post(protect, Authorization(["admin"]), getUserDetails);

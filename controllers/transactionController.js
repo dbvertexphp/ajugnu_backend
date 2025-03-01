@@ -443,6 +443,81 @@ const getAllTransactionsInAdmin = asyncHandler(async (req, res) => {
 });
 
 
+const getAllCodTransactionsInAdmin = asyncHandler(async (req, res) => {
+      const { page = 1, limit = 10, sortBy = "createdAt", order = "desc", search = "" } = req.query;
+
+      try {
+        const pipeline = [
+          { $match: { payment_method: "cod" } }, // Filter COD orders
+          { $unwind: "$items" }, // Unwind items array to filter status
+          { $match: { "items.status": "delivered" } }, // Filter delivered items
+
+          // Lookup for user details
+          {
+            $lookup: {
+              from: "users",
+              localField: "user_id",
+              foreignField: "_id",
+              as: "user",
+            },
+          },
+          {
+            $unwind: { path: "$user", preserveNullAndEmptyArrays: true },
+          },
+
+          // Search functionality
+          search
+            ? {
+                $match: {
+                  $or: [
+                    { "user.full_name": { $regex: search, $options: "i" } }, // Search in user name
+                    { order_id: { $regex: search, $options: "i" } }, // Search in order_id
+                  ],
+                },
+              }
+            : null,
+
+          // Sorting & Pagination
+          { $sort: { [sortBy]: order === "desc" ? -1 : 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: parseInt(limit) },
+
+          // Project required fields
+          {
+            $project: {
+              _id: 1,
+              order_id: 1,
+              payment_method: 1,
+              total_amount: 1,
+              item_status: "$items.status",
+              created_at: 1,
+              user_name: { $ifNull: ["$user.full_name", "N/A"] },
+            },
+          },
+        ].filter(Boolean); // Remove null values (if search is not applied)
+
+        // Execute aggregation
+        const transactions = await Order.aggregate(pipeline);
+
+        // Count total transactions (excluding pagination)
+        const totalTransactions = await Order.countDocuments({
+          payment_method: "cod",
+          "items.status": "delivered",
+        });
+
+        res.status(200).json({
+          message: "Transactions fetched successfully",
+          transactions,
+          totalPages: Math.ceil(totalTransactions / limit),
+          currentPage: parseInt(page),
+          totalTransactions,
+        });
+      } catch (error) {
+        console.error("Error fetching transactions:", error.message);
+        res.status(500).json({ message: "Internal Server Error", status: false });
+      }
+    });
+
 
 
 
@@ -452,4 +527,5 @@ module.exports = {
   getAllTransactionsByUser,
   getAllTransactionsByTeacher,
   getAllTransactionsInAdmin,
+  getAllCodTransactionsInAdmin
 };
