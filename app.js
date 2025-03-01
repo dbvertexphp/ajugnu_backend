@@ -70,7 +70,7 @@ const corsOptions = {
 //       callback(null, true);
 //   },
 // };
-// app.use(cors(corsOptions));
+app.use(cors(corsOptions));
 
 // --------------------------Routes------------------------------
 
