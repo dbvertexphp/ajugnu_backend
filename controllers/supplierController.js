@@ -732,7 +732,7 @@ const getProductsBySupplierId = asyncHandler(async (req, res) => {
     if (!supplier) {
       throw new Error("Supplier not found");
     }
-    const products = await Product.find({ supplier_id, active: true }).populate("supplier_id").skip(skip).limit(limit);
+    const products = await Product.find({ supplier_id, active: true, delete_status: true }).populate("supplier_id").skip(skip).limit(limit);
 
     res.status(200).json({
       products,
@@ -1038,6 +1038,7 @@ const getPopularProduct = asyncHandler(async (req, res) => {
     // Fetch products from suppliers with matching pin codes
     const popularProducts = await Product.find({
       active: true,
+      delete_status: true,
       supplier_id: { $in: supplierIds }, // Filter products by matching supplier IDs
     })
       .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
@@ -1115,6 +1116,7 @@ const getSimilarProducts = asyncHandler(async (req, res) => {
       product_size: product.product_size,
       product_role: product.product_role,
       active: true,
+      delete_status: true,
     })
       .sort({ averageRating: -1, ratingCount: -1 }) // Sort by highest rating and rating count
       .limit(10) // Limit to top 10 similar products

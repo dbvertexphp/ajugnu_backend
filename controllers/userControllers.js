@@ -312,14 +312,14 @@ const authUser = asyncHandler(async (req, res) => {
       throw new ErrorHandler("JWT_SECRET is not defined in environment variables", 500);
     }
 
-    const token = jwt.sign({ _id: userdata._id, role: userdata.role }, process.env.JWT_SECRET);
+    const token = jwt.sign({ _id: userdata._id, role: userdata.role }, process.env.JWT_SECRET, { expiresIn: '1hr' });
 
     // Set the token in a cookie for 30 days
     res.setHeader(
       "Set-Cookie",
       cookie.serialize("Websitetoken", token, {
         httpOnly: true,
-        expires: new Date(Date.now() + 60 * 60 * 24 * 1000), // 1 days
+        expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour (60 minutes * 60 seconds * 1000 ms)
         path: "/",
       })
     );
@@ -368,14 +368,14 @@ const adminLogin = asyncHandler(async (req, res) => {
       }
 
       // Generate JWT token for the admin, including their role
-      const token = jwt.sign({ _id: user._id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+      const token = jwt.sign({ _id: user._id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1hr' });
 
       // Set the JWT token in a cookie for 1 days
       res.setHeader(
             "Set-Cookie",
             cookie.serialize("Websitetoken", token, {
               httpOnly: true,
-              expires: new Date(Date.now() + 60 * 60 * 24 * 1000), // 1 day
+              expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour (60 minutes * 60 seconds * 1000 ms)
               path: "/",
             })
           );
@@ -988,7 +988,15 @@ const getFavoriteProduct = asyncHandler(async (req, res) => {
     }
 
     // Find all favorite products for the user
-    const favorites = await Favorite.find({ user_id: userID }).sort({ createdAt: -1 }).populate("product_id");
+//     const favorites = await Favorite.find({ user_id: userID }).sort({ createdAt: -1 }).populate("product_id");
+const favorites = await Favorite.find({ user_id: userID })
+  .sort({ createdAt: -1 })
+  .populate({
+    path: "product_id",
+    model: "Product",
+    match: { delete_status: true }  // Filters products inside populate
+  });
+
 
     if (!favorites.length) {
       return res.status(404).json({ message: "No favorite products found", status: false });
@@ -1030,9 +1038,16 @@ const addToCart = asyncHandler(async (req, res) => {
     }
 
     // Check if the product exists and populate supplier information
-    const product = await Product.findById(product_id).populate({
+//     const product = await Product.findById(product_id).populate({
+//       path: "supplier_id",
+//       model: "User",
+//     });
+const product = await Product.findOne({
+      _id: product_id,
+      delete_status: true
+    }).populate({
       path: "supplier_id",
-      model: "User",
+      model: "User"
     });
     if (!product) {
       return res.status(404).json({ message: "Product not found", status: false });
@@ -1133,7 +1148,12 @@ const getProductDetailByProductId = asyncHandler(async (req, res) => {
     }
 
     // Find the product by ID
-    const product = await Product.findById(product_id);
+//     const product = await Product.findById(product_id);
+
+const product = await Product.findOne({
+      _id: product_id,
+      delete_status: true
+    });
 
     if (!product) {
       return res.status(404).json({ message: "Product not found", status: false });
@@ -3408,6 +3428,7 @@ const getProductsRendom = asyncHandler(async (req, res) => {
         { product_role: "supplier" },
         { active: true },
         { default_product: true },
+        { delete_status: true },
         {
           $or: [{ english_name: { $regex: search, $options: "i" } }],
         },
