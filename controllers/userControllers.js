@@ -1523,6 +1523,119 @@ const decreaseCartQuantity = asyncHandler(async (req, res) => {
 
 
 
+// const checkout = asyncHandler(async (req, res) => {
+//       const userID = req.headers.userID;
+//       const { shipping_address, payment_method } = req.body;
+
+//       try {
+//         // Validate required fields
+//         if (!userID || !shipping_address || !payment_method) {
+//           return res.status(400).json({ message: "Missing required fields", status: false });
+//         }
+
+//         // Fetch all cart items for the user
+//       //   const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
+//       const cartItems = await Cart.find({ user_id: userID })
+//   .populate({
+//     path: "product_id", // This filters the populated products
+//   });
+
+//   console.log("cartItes", cartItems);
+
+//         if (!cartItems || cartItems.length === 0) {
+//           return res.status(404).json({ message: "No items found in cart", status: false });
+//         }
+
+//         let totalAmount = 0;
+//         const verificationCodes = {};
+//         const supplierIds = new Set();
+//         const items = [];
+
+//         // **Check for deleted or out-of-stock products**
+//         for (const item of cartItems) {
+//           const product = item.product_id;
+
+//           if (!product) {
+//             return res.status(400).json({ message: "Some products are missing or unavailable", status: false });
+//           }
+
+//           if (product.delete_status === false ) {
+//             return res.status(400).json({
+//               message: `Product "${product.english_name}" is deleted and cannot be purchased.`,
+//               status: false,
+//             });
+//           }
+
+//           if (product.quantity <= 0) {
+//             return res.status(400).json({
+//               message: `Product "${product.english_name}" is out of stock and cannot be purchased.`,
+//               status: false,
+//             });
+//           }
+
+//           // Ensure requested quantity does not exceed available stock
+//           if (item.quantity > product.quantity) {
+//             return res.status(400).json({
+//               message: `Requested quantity for "${product.english_name}" exceeds available stock.`,
+//               status: false,
+//             });
+//           }
+
+//           totalAmount += product.price * item.quantity;
+//           supplierIds.add(product.supplier_id.toString());
+
+//           // Generate unique verification code for supplier
+//           const supplierId = product.supplier_id.toString();
+//           if (!verificationCodes[supplierId]) {
+//             verificationCodes[supplierId] = generateVerificationCode();
+//           }
+
+//           items.push({
+//             product_id: product._id,
+//             quantity: item.quantity,
+//             supplier_id: supplierId,
+//             verification_code: verificationCodes[supplierId],
+//             status: "order",
+//           });
+//         }
+
+//         // **Proceed with Order Creation (same as your existing logic)**
+//         const orderId = generateOrderID();
+//         const order = new Order({
+//           order_id: orderId,
+//           user_id: userID,
+//           items,
+//           shipping_address,
+//           payment_method,
+//           total_amount: totalAmount,
+//         });
+
+//         const savedOrder = await order.save();
+
+//         // **Notify User & Suppliers (same as your existing logic)**
+
+//         // **Update Product Stock**
+//         for (const item of cartItems) {
+//           await Product.findByIdAndUpdate(item.product_id._id, {
+//             $inc: { quantity: -item.quantity }
+//           });
+//         }
+
+//         // **Clear Cart**
+//         await Cart.deleteMany({ user_id: userID });
+
+//         res.status(201).json({
+//           status: true,
+//           message: "Order placed successfully",
+//           order: savedOrder,
+//         });
+
+//       } catch (error) {
+//         console.error("Error during checkout:", error.message);
+//         res.status(500).json({ error: "Internal Server Error" });
+//       }
+//     });
+
 const checkout = asyncHandler(async (req, res) => {
       const userID = req.headers.userID;
       const { shipping_address, payment_method } = req.body;
@@ -1533,11 +1646,20 @@ const checkout = asyncHandler(async (req, res) => {
           return res.status(400).json({ message: "Missing required fields", status: false });
         }
 
-        // Fetch all cart items for the user
+        // Fetch all cart items for the user and populate product details
         const cartItems = await Cart.find({ user_id: userID }).populate("product_id");
 
         if (!cartItems || cartItems.length === 0) {
           return res.status(404).json({ message: "No items found in cart", status: false });
+        }
+
+        // **Filter out products that should NOT be included in checkout**
+        const validCartItems = cartItems.filter(item =>
+          item.product_id && item.product_id.delete_status === true && item.product_id.quantity > 0
+        );
+
+        if (validCartItems.length === 0) {
+          return res.status(400).json({ message: "All products in cart are unavailable or out of stock.", status: false });
         }
 
         let totalAmount = 0;
@@ -1545,40 +1667,13 @@ const checkout = asyncHandler(async (req, res) => {
         const supplierIds = new Set();
         const items = [];
 
-        // **Check for deleted or out-of-stock products**
-        for (const item of cartItems) {
+        // **Process Valid Cart Items**
+        for (const item of validCartItems) {
           const product = item.product_id;
-
-          if (!product) {
-            return res.status(400).json({ message: "Some products are missing or unavailable", status: false });
-          }
-
-          if (product.delete_status === false ) {
-            return res.status(400).json({
-              message: `Product "${product.english_name}" is deleted and cannot be purchased.`,
-              status: false,
-            });
-          }
-
-          if (product.quantity <= 0) {
-            return res.status(400).json({
-              message: `Product "${product.english_name}" is out of stock and cannot be purchased.`,
-              status: false,
-            });
-          }
-
-          // Ensure requested quantity does not exceed available stock
-          if (item.quantity > product.quantity) {
-            return res.status(400).json({
-              message: `Requested quantity for "${product.english_name}" exceeds available stock.`,
-              status: false,
-            });
-          }
-
           totalAmount += product.price * item.quantity;
           supplierIds.add(product.supplier_id.toString());
 
-          // Generate unique verification code for supplier
+          // Generate unique verification code for each supplier
           const supplierId = product.supplier_id.toString();
           if (!verificationCodes[supplierId]) {
             verificationCodes[supplierId] = generateVerificationCode();
@@ -1593,7 +1688,7 @@ const checkout = asyncHandler(async (req, res) => {
           });
         }
 
-        // **Proceed with Order Creation (same as your existing logic)**
+        // **Proceed with Order Creation**
         const orderId = generateOrderID();
         const order = new Order({
           order_id: orderId,
@@ -1606,10 +1701,8 @@ const checkout = asyncHandler(async (req, res) => {
 
         const savedOrder = await order.save();
 
-        // **Notify User & Suppliers (same as your existing logic)**
-
         // **Update Product Stock**
-        for (const item of cartItems) {
+        for (const item of validCartItems) {
           await Product.findByIdAndUpdate(item.product_id._id, {
             $inc: { quantity: -item.quantity }
           });
@@ -1629,6 +1722,8 @@ const checkout = asyncHandler(async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
       }
     });
+
+
 
 
 const getOrderNotifications = asyncHandler(async (req, res) => {

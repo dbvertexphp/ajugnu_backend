@@ -1056,7 +1056,10 @@ const getPopularProduct = asyncHandler(async (req, res) => {
 
     // Fetch cart items to get the count of products in the cart
     const cartItems = await Cart.find({ user_id: userID });
-    const cartProductCount = cartItems.length;
+
+
+
+    const cartProductCount = popularProducts.length;
 
     if (popularProducts.length === 0) {
       return res.status(404).json({ message: "No popular products found", status: false });
