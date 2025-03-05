@@ -3672,70 +3672,142 @@ const updateUserRole = asyncHandler(async (req, res, next) => {
 
 
 
+// const change_password = asyncHandler(async (req, res) => {
+//       const { oldPassword, newPassword } = req.body;
+
+//       // Ensure both old and new passwords are provided
+//       if (!oldPassword || !newPassword) {
+//         return res.status(400).json({ message: 'Please provide both old and new passwords.' });
+//       }
+
+//       // Ensure req.user exists (from the verifyToken middleware)
+//       if (!req.user) {
+//         return res.status(401).json({ message: 'User not authenticated.' });
+//       }
+
+//       // Find the user by ID (use req.user.id after JWT verification)
+//       const user = await User.findById(req.user.id);
+
+//       if (!user) {
+//         return res.status(404).json({ message: 'User not found.' });
+//       }
+
+
+
+//       // Compare the old password with the stored password (hashed) using argon2
+//       try {
+//         const isMatch = await argon2.verify(user.password, oldPassword);
+//         console.log('Password comparison result:', isMatch);  // Log comparison result
+
+//         if (!isMatch) {
+//           return res.status(401).json({ message: 'Incorrect old password.' });
+//         }
+//       } catch (err) {
+//         console.error('Error during password comparison:', err);
+//         return res.status(500).json({ message: 'Error during password comparison.' });
+//       }
+
+//       // Optionally validate new password length (uncomment this part if needed)
+//       // if (newPassword.length <= 8) {
+//       //   return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
+//       // }
+
+//       try {
+//         // Hash the new password using argon2
+//         const hashedPassword = await argon2.hash(newPassword);
+//         console.log('New password hash (argon2):', hashedPassword);  // Log new hashed password
+
+//         // Update the password directly in the database
+//         const result = await User.updateOne({ _id: user._id }, { $set: { password: hashedPassword } });
+
+//         // Check if update was successful
+//         if (result.nModified === 0) {
+//           return res.status(500).json({ message: 'Failed to update password in the database.' });
+//         }
+
+//         // Fetch the user again to verify the password was updated correctly
+//         const updatedUser = await User.findById(req.user.id);
+
+
+//         // Return success message
+//         res.status(200).json({ message: 'Password updated successfully.' });
+//       } catch (err) {
+//         console.error('Error hashing new password with argon2:', err);
+//         res.status(500).json({ message: 'Error hashing the new password.' });
+//       }
+// });
+
+
 const change_password = asyncHandler(async (req, res) => {
       const { oldPassword, newPassword } = req.body;
 
       // Ensure both old and new passwords are provided
       if (!oldPassword || !newPassword) {
-        return res.status(400).json({ message: 'Please provide both old and new passwords.' });
+        return res.status(400).json({ message: "Please provide both old and new passwords." });
       }
 
       // Ensure req.user exists (from the verifyToken middleware)
       if (!req.user) {
-        return res.status(401).json({ message: 'User not authenticated.' });
+        return res.status(401).json({ message: "User not authenticated." });
       }
 
       // Find the user by ID (use req.user.id after JWT verification)
       const user = await User.findById(req.user.id);
-
       if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
+        return res.status(404).json({ message: "User not found." });
       }
-
-
 
       // Compare the old password with the stored password (hashed) using argon2
       try {
         const isMatch = await argon2.verify(user.password, oldPassword);
-        console.log('Password comparison result:', isMatch);  // Log comparison result
-
         if (!isMatch) {
-          return res.status(401).json({ message: 'Incorrect old password.' });
+          return res.status(401).json({ message: "Incorrect old password." });
         }
       } catch (err) {
-        console.error('Error during password comparison:', err);
-        return res.status(500).json({ message: 'Error during password comparison.' });
+        console.error("Error during password comparison:", err);
+        return res.status(500).json({ message: "Error during password comparison." });
       }
-
-      // Optionally validate new password length (uncomment this part if needed)
-      // if (newPassword.length <= 8) {
-      //   return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
-      // }
 
       try {
         // Hash the new password using argon2
         const hashedPassword = await argon2.hash(newPassword);
-        console.log('New password hash (argon2):', hashedPassword);  // Log new hashed password
 
-        // Update the password directly in the database
+        // Update the password in the database
         const result = await User.updateOne({ _id: user._id }, { $set: { password: hashedPassword } });
 
         // Check if update was successful
-        if (result.nModified === 0) {
-          return res.status(500).json({ message: 'Failed to update password in the database.' });
+        if (result.modifiedCount === 0) {
+          return res.status(500).json({ message: "Failed to update password in the database." });
         }
 
-        // Fetch the user again to verify the password was updated correctly
-        const updatedUser = await User.findById(req.user.id);
+        // Invalidate current session by blacklisting the token
+        const authHeader = req.headers.authorization;
+        if (authHeader) {
+          const token = authHeader.split(" ")[1]; // Extract token from "Bearer {token}"
+          blacklistToken(token);
 
+          // Expire the cookie immediately
+          res.setHeader(
+            "Set-Cookie",
+            cookie.serialize("Websitetoken", "", {
+              httpOnly: true,
+              expires: new Date(0),
+              path: "/",
+            })
+          );
 
-        // Return success message
-        res.status(200).json({ message: 'Password updated successfully.' });
+          return res.json({ message: "Please login with your new password", status: true });
+        }
+
+        // Return success message if no token exists
+        res.status(200).json({ message: "Password updated successfully." });
       } catch (err) {
-        console.error('Error hashing new password with argon2:', err);
-        res.status(500).json({ message: 'Error hashing the new password.' });
+        console.error("Error hashing new password with argon2:", err);
+        res.status(500).json({ message: "Error hashing the new password." });
       }
-});
+    });
+
+
 
 
 
